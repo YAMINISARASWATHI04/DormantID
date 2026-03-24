@@ -161,6 +161,12 @@
   margin-bottom: $spacing-04;
   padding-bottom: $spacing-03;
   border-bottom: 1px solid $border-subtle-01;
+  gap: $spacing-04;
+  flex-wrap: wrap;
+}
+
+.history-download-btn {
+  margin-left: auto;
 }
 
 .history-timestamp {
@@ -256,3 +262,38 @@
 }
 
 // Made with Bob
+
+// Extractions section
+.extractions-container {
+  margin-top: 1rem;
+
+  .extractions-description {
+    margin-bottom: 1.5rem;
+    color: #525252;
+    font-size: 0.875rem;
+  }
+
+  .cds--data-table {
+    margin-top: 1rem;
+  }
+
+  .cds--btn--ghost {
+    padding: 0.5rem 1rem;
+  }
+}
+
+.empty-extractions {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: #525252;
+
+  p:first-child {
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .empty-extractions-subtitle {
+    font-size: 0.875rem;
+    color: #8d8d8d;
+  }
+}

@@ -8,9 +8,17 @@ import {
   ProgressBar,
   InlineNotification,
   Loading,
-  Tag
+  Tag,
+  DataTable,
+  TableContainer,
+  Table,
+  TableHead,
+  TableRow,
+  TableHeader,
+  TableBody,
+  TableCell
 } from '@carbon/react';
-import { Renew } from '@carbon/icons-react';
+import { Renew, Download, StopFilled } from '@carbon/icons-react';
 import axios from 'axios';
 import './App.scss';
 
@@ -24,6 +32,8 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [notification, setNotification] = useState(null);
   const [polling, setPolling] = useState(false);
+  const [extractions, setExtractions] = useState([]);
+  const [loadingExtractions, setLoadingExtractions] = useState(false);
 
   // Fetch status from API
   const fetchStatus = useCallback(async () => {
@@ -59,11 +69,58 @@ function App() {
     }
   }, []);
 
-  // Initial status and history fetch
+  // Fetch extractions from API
+  const fetchExtractions = useCallback(async () => {
+    setLoadingExtractions(true);
+    try {
+      const response = await axios.get(`${API_BASE_URL}/extractions`);
+      if (response.data.success) {
+        setExtractions(response.data.extractions);
+      }
+    } catch (error) {
+      console.error('Error fetching extractions:', error);
+    } finally {
+      setLoadingExtractions(false);
+    }
+  }, []);
+
+  // Handle file download
+  const handleDownload = async (filename) => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/download/${filename}`, {
+        responseType: 'blob'
+      });
+      
+      // Create download link
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      
+      setNotification({
+        kind: 'success',
+        title: 'Download Started',
+        subtitle: `Downloading ${filename}`
+      });
+    } catch (error) {
+      setNotification({
+        kind: 'error',
+        title: 'Download Failed',
+        subtitle: error.response?.data?.error || 'Failed to download file'
+      });
+    }
+  };
+
+  // Initial status, history, and extractions fetch
   useEffect(() => {
     fetchStatus();
     fetchHistory();
-  }, [fetchStatus, fetchHistory]);
+    fetchExtractions();
+  }, [fetchStatus, fetchHistory, fetchExtractions]);
 
   // Polling effect
   useEffect(() => {
@@ -120,6 +177,28 @@ function App() {
     }
   };
 
+  // Handle stop
+  const handleStop = async () => {
+    try {
+      const response = await axios.post(`${API_BASE_URL}/stop`);
+      if (response.data.success) {
+        setNotification({
+          kind: 'info',
+          title: 'Stop Requested',
+          subtitle: 'Extraction will stop after current batch'
+        });
+        fetchStatus();
+      }
+    } catch (error) {
+      const errorMessage = error.response?.data?.error || 'Failed to stop extraction';
+      setNotification({
+        kind: 'error',
+        title: 'Error',
+        subtitle: errorMessage
+      });
+    }
+  };
+
   // Handle reset
   const handleReset = async () => {
     try {
@@ -149,6 +228,7 @@ function App() {
     const statusConfig = {
       not_started: { type: 'gray', text: 'Not Started' },
       under_processing: { type: 'blue', text: 'Processing' },
+      stopped: { type: 'purple', text: 'Stopped' },
       finished: {
         type: status.error ? 'red' : 'green',
         text: status.error ? 'Failed' : 'Completed'
@@ -239,6 +319,15 @@ function App() {
               disabled={isDisabled}
             >
               {loading ? 'Starting...' : 'Start Extraction'}
+            </Button>
+
+            <Button
+              kind="danger"
+              renderIcon={StopFilled}
+              onClick={handleStop}
+              disabled={!isProcessing}
+            >
+              Stop Extraction
             </Button>
 
             <Button
@@ -365,7 +454,7 @@ function App() {
           {history.length > 0 ? (
             <div className="history-container">
               <p className="history-description">
-                View past extraction jobs. Click on an entry to see details.
+                View past extraction jobs and download their data files.
               </p>
               <div className="history-list">
                 {history.map((entry) => (
@@ -377,6 +466,17 @@ function App() {
                       <span className="history-timestamp">
                         {new Date(entry.timestamp).toLocaleString()}
                       </span>
+                      {entry.status === 'completed' && entry.filename && (
+                        <Button
+                          kind="ghost"
+                          size="sm"
+                          renderIcon={Download}
+                          onClick={() => handleDownload(entry.filename)}
+                          className="history-download-btn"
+                        >
+                          Download
+                        </Button>
+                      )}
                     </div>
                     <div className="history-item-details">
                       <div className="history-detail">
@@ -408,6 +508,12 @@ function App() {
                           </span>
                         </div>
                       )}
+                      {entry.filename && (
+                        <div className="history-detail">
+                          <span className="history-label">File:</span>
+                          <span className="history-value">{entry.filename}</span>
+                        </div>
+                      )}
                       {entry.error && (
                         <div className="history-detail error">
                           <span className="history-label">Error:</span>
@@ -434,5 +540,3 @@ function App() {
 }
 
 export default App;
-
-// Made with Bob
