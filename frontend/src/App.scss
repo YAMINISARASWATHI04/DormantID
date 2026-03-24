@@ -1,0 +1,258 @@
+@use '@carbon/react/scss/spacing' as *;
+@use '@carbon/react/scss/theme' as *;
+@use '@carbon/react/scss/breakpoint' as *;
+
+.app-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: $spacing-07;
+  min-height: 100vh;
+  background-color: $layer-01;
+}
+
+.app-header {
+  margin-bottom: $spacing-07;
+  
+  h1 {
+    font-size: 2.5rem;
+    font-weight: 300;
+    margin-bottom: $spacing-03;
+    color: $text-primary;
+  }
+  
+  p {
+    font-size: 1rem;
+    color: $text-secondary;
+  }
+}
+
+.date-picker-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: $spacing-05;
+  margin-bottom: $spacing-05;
+  
+  @include breakpoint-down(md) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.button-container {
+  display: flex;
+  gap: $spacing-05;
+  margin-top: $spacing-05;
+  
+  @include breakpoint-down(sm) {
+    flex-direction: column;
+    
+    button {
+      width: 100%;
+    }
+  }
+}
+
+.status-container {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-05;
+}
+
+.status-row {
+  display: flex;
+  align-items: center;
+  gap: $spacing-05;
+  padding: $spacing-03 0;
+  border-bottom: 1px solid $border-subtle-01;
+  
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+.status-label {
+  font-weight: 600;
+  color: $text-secondary;
+  min-width: 180px;
+}
+
+.status-value {
+  color: $text-primary;
+  font-weight: 400;
+}
+
+.progress-container {
+  margin-top: $spacing-05;
+  padding: $spacing-05;
+  background-color: $layer-02;
+  border-radius: 4px;
+}
+
+// Carbon overrides
+.cds--accordion__item {
+  border-top: 1px solid $border-subtle-01;
+}
+
+.cds--accordion__heading {
+  background-color: $layer-02;
+  
+  &:hover {
+    background-color: $layer-hover-02;
+  }
+}
+
+.cds--accordion__content {
+  padding: $spacing-05;
+  background-color: $layer-01;
+}
+
+.cds--inline-notification {
+  margin-bottom: $spacing-05;
+  max-width: 100%;
+}
+
+.cds--tag {
+  display: inline-flex;
+  align-items: center;
+  gap: $spacing-02;
+}
+
+// Loading animation
+.cds--loading {
+  margin-right: $spacing-02;
+}
+
+// History styles
+.history-container {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-05;
+}
+
+.history-description {
+  color: $text-secondary;
+  margin-bottom: $spacing-03;
+}
+
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-04;
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+.history-item {
+  padding: $spacing-05;
+  background-color: $layer-02;
+  border-radius: 4px;
+  border-left: 3px solid $border-interactive;
+  transition: all 0.2s ease;
+  
+  &:hover {
+    background-color: $layer-hover-02;
+    border-left-color: $link-primary;
+  }
+}
+
+.history-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: $spacing-04;
+  padding-bottom: $spacing-03;
+  border-bottom: 1px solid $border-subtle-01;
+}
+
+.history-timestamp {
+  color: $text-secondary;
+  font-size: 0.875rem;
+}
+
+.history-item-details {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-03;
+}
+
+.history-detail {
+  display: flex;
+  gap: $spacing-03;
+  
+  &.error {
+    color: $text-error;
+  }
+}
+
+.history-label {
+  font-weight: 600;
+  color: $text-secondary;
+  min-width: 100px;
+  font-size: 0.875rem;
+}
+
+.history-value {
+  color: $text-primary;
+  font-size: 0.875rem;
+}
+
+.empty-history {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: $spacing-07;
+  color: $text-secondary;
+  text-align: center;
+  
+  p {
+    margin: $spacing-02 0;
+    font-size: 1.5rem;
+    
+    &:first-child {
+      font-size: 2rem;
+    }
+  }
+  
+  .empty-history-subtitle {
+    font-size: 0.875rem;
+    opacity: 0.7;
+  }
+}
+
+// Responsive adjustments
+@include breakpoint-down(md) {
+  .app-container {
+    padding: $spacing-05;
+  }
+  
+  .app-header h1 {
+    font-size: 2rem;
+  }
+  
+  .history-item-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: $spacing-03;
+  }
+}
+
+@include breakpoint-down(sm) {
+  .app-container {
+    padding: $spacing-04;
+  }
+  
+  .app-header h1 {
+    font-size: 1.75rem;
+  }
+  
+  .status-label {
+    min-width: 120px;
+    font-size: 0.875rem;
+  }
+  
+  .history-label {
+    min-width: 80px;
+  }
+}
+
+// Made with Bob

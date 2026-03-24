@@ -1,0 +1,8 @@
+# Core dependencies for Cloudant data extraction pipeline
+requests>=2.31.0
+urllib3>=2.0.0
+python-dotenv>=1.0.0
+
+# Optional: For async operations (if needed in future)
+# aiohttp>=3.9.0
+# asyncio>=3.4.3
