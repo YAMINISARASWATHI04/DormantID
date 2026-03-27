@@ -15,7 +15,9 @@ import sys
 
 # Add parent directory to path to import cloudant_extractor
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from cloudant_extractor import CloudantExtractor
+from cloudant_extractor_async import CloudantExtractorAsync
+from backend.filters import FilterManager
+import asyncio
 
 # Load environment variables
 load_dotenv()
@@ -124,21 +126,43 @@ class HistoryManager:
 class ExtractorWrapper:
     """Wrapper for CloudantExtractor with status tracking"""
     
-    def __init__(self, start_date, end_date):
+    def __init__(self, start_date, end_date, filter_config=None, batch_size=3000):
         self.start_date = start_date
         self.end_date = end_date
         self.extractor = None
+        self.filter_config = filter_config or {}
+        self.filter_manager = None
+        self.batch_size = batch_size
         
     def calculate_total_months(self):
         """Calculate total months in date range"""
-        start = datetime.strptime(self.start_date, '%Y-%m-%d')
-        end = datetime.strptime(self.end_date, '%Y-%m-%d')
+        # Parse datetime with or without timestamp
+        try:
+            start = datetime.strptime(self.start_date, '%Y-%m-%d %H:%M:%S')
+        except ValueError:
+            try:
+                start = datetime.strptime(self.start_date, '%Y-%m-%d %H:%M')
+            except ValueError:
+                start = datetime.strptime(self.start_date, '%Y-%m-%d')
+        
+        try:
+            end = datetime.strptime(self.end_date, '%Y-%m-%d %H:%M:%S')
+        except ValueError:
+            try:
+                end = datetime.strptime(self.end_date, '%Y-%m-%d %H:%M')
+            except ValueError:
+                end = datetime.strptime(self.end_date, '%Y-%m-%d')
         
         months = (end.year - start.year) * 12 + (end.month - start.month) + 1
         return months
     
     def run(self):
-        """Run extraction with status updates"""
+        """Run extraction with status updates (wraps async execution)"""
+        # Run async extraction in a new event loop
+        asyncio.run(self._run_async())
+    
+    async def _run_async(self):
+        """Async extraction logic"""
         start_time = time.time()
         
         # Create output filename with timestamp
@@ -154,9 +178,22 @@ class ExtractorWrapper:
         self.extracted_data = []
         
         try:
-            # Parse dates
-            start = datetime.strptime(self.start_date, '%Y-%m-%d')
-            end = datetime.strptime(self.end_date, '%Y-%m-%d')
+            # Parse dates with or without timestamp
+            try:
+                start = datetime.strptime(self.start_date, '%Y-%m-%d %H:%M:%S')
+            except ValueError:
+                try:
+                    start = datetime.strptime(self.start_date, '%Y-%m-%d %H:%M')
+                except ValueError:
+                    start = datetime.strptime(self.start_date, '%Y-%m-%d')
+            
+            try:
+                end = datetime.strptime(self.end_date, '%Y-%m-%d %H:%M:%S')
+            except ValueError:
+                try:
+                    end = datetime.strptime(self.end_date, '%Y-%m-%d %H:%M')
+                except ValueError:
+                    end = datetime.strptime(self.end_date, '%Y-%m-%d')
             
             # Calculate total months
             total_months = self.calculate_total_months()
@@ -173,8 +210,14 @@ class ExtractorWrapper:
                 'current_month': f"{start.year}-{start.month:02d}",
                 'error': None,
                 'start_time': start_time,
-                'output_file': output_filename
+                'output_file': output_filename,
+                'filters': self.filter_config
             })
+            
+            # Initialize filter manager
+            self.filter_manager = FilterManager(self.filter_config)
+            logger.info(f"Filter configuration: {self.filter_config}")
+            logger.info(f"Enabled filters: {self.filter_manager.get_stats()['enabled_filters']}")
             
             # Initialize extractor
             username = os.getenv('CLOUDANT_USERNAME')
@@ -188,14 +231,17 @@ class ExtractorWrapper:
                 base_url=base_url,
                 username=username,
                 password=password,
-                batch_size=1000,
+                batch_size=self.batch_size,
                 status_callback=self.update_progress,
                 data_storage_callback=self.store_batch_data,
                 total_months=total_months
             )
             
+            # Create session and run extraction
+            await self.extractor.create_session()
+            
             # Run extraction
-            self.extractor.extract_date_range(
+            await self.extractor.extract_date_range(
                 start_year=start.year,
                 start_month=start.month,
                 end_year=end.year,
@@ -211,7 +257,8 @@ class ExtractorWrapper:
                 'status': 'finished',
                 'progress_percent': 100,
                 'error': None,
-                'duration_seconds': duration_seconds
+                'duration_seconds': duration_seconds,
+                'filters': self.filter_config
             })
             
             # Add to history
@@ -225,7 +272,8 @@ class ExtractorWrapper:
                 'error': None,
                 'timestamp': datetime.now().isoformat(),
                 'duration_seconds': duration_seconds,
-                'filename': output_filename
+                'filename': output_filename,
+                'filters': self.filter_config
             })
             
         except InterruptedError as e:
@@ -237,7 +285,8 @@ class ExtractorWrapper:
             StatusManager.update_status({
                 'status': 'stopped',
                 'error': 'Stopped by user',
-                'duration_seconds': duration_seconds
+                'duration_seconds': duration_seconds,
+                'filters': self.filter_config
             })
             
             # Add stopped entry to history
@@ -251,7 +300,8 @@ class ExtractorWrapper:
                 'error': 'Stopped by user',
                 'timestamp': datetime.now().isoformat(),
                 'duration_seconds': duration_seconds,
-                'filename': output_filename if hasattr(self, 'output_file') else None
+                'filename': output_filename if hasattr(self, 'output_file') else None,
+                'filters': self.filter_config
             })
             
             print(f"Extraction stopped by user")
@@ -265,7 +315,8 @@ class ExtractorWrapper:
             StatusManager.update_status({
                 'status': 'finished',
                 'error': str(e),
-                'duration_seconds': duration_seconds
+                'duration_seconds': duration_seconds,
+                'filters': self.filter_config
             })
             
             # Add failed entry to history
@@ -279,7 +330,8 @@ class ExtractorWrapper:
                 'error': str(e),
                 'timestamp': datetime.now().isoformat(),
                 'duration_seconds': duration_seconds,
-                'filename': None
+                'filename': None,
+                'filters': self.filter_config
             })
             
             print(f"Extraction error: {e}")
@@ -290,37 +342,62 @@ class ExtractorWrapper:
                 self.finalize_output_file()
             
             if self.extractor:
-                self.extractor.close()
+                await self.extractor.close()
     
     def store_batch_data(self, batch):
-        """Store batch data to file incrementally with date filtering"""
+        """Store batch data to file incrementally with date and plugin filtering"""
         try:
             # Filter records to ensure they're within the requested date range
-            start = datetime.strptime(self.start_date, '%Y-%m-%d')
-            end = datetime.strptime(self.end_date, '%Y-%m-%d')
+            # Parse with or without timestamp
+            try:
+                start = datetime.strptime(self.start_date, '%Y-%m-%d %H:%M:%S')
+            except ValueError:
+                try:
+                    start = datetime.strptime(self.start_date, '%Y-%m-%d %H:%M')
+                except ValueError:
+                    start = datetime.strptime(self.start_date, '%Y-%m-%d')
+            
+            try:
+                end = datetime.strptime(self.end_date, '%Y-%m-%d %H:%M:%S')
+            except ValueError:
+                try:
+                    end = datetime.strptime(self.end_date, '%Y-%m-%d %H:%M')
+                except ValueError:
+                    end = datetime.strptime(self.end_date, '%Y-%m-%d')
             
             filtered_batch = []
-            filtered_out = 0
+            date_filtered_out = 0
+            plugin_filtered_out = 0
             
             for record in batch:
                 key = record.get('key', [])
                 if len(key) >= 7:
-                    # Extract date from key: [boolean, year, month, day, hour, minute, second]
+                    # Extract datetime from key: [boolean, year, month, day, hour, minute, second]
                     try:
-                        record_date = datetime(key[1], key[2], key[3])
-                        # Only include if within date range
-                        if start <= record_date <= end:
-                            filtered_batch.append(record)
+                        record_datetime = datetime(key[1], key[2], key[3], key[4], key[5], key[6])
+                        # Only include if within datetime range
+                        if start <= record_datetime <= end:
+                            # Apply plugin filters if filter manager is available
+                            if self.filter_manager:
+                                if self.filter_manager.filter_record(record):
+                                    filtered_batch.append(record)
+                                else:
+                                    plugin_filtered_out += 1
+                            else:
+                                filtered_batch.append(record)
                         else:
-                            filtered_out += 1
-                            logger.debug(f"Filtered out record with date {record_date.date()} (outside range {start.date()} to {end.date()})")
+                            date_filtered_out += 1
+                            logger.debug(f"Filtered out record with datetime {record_datetime} (outside range {start} to {end})")
                     except (ValueError, IndexError) as e:
                         # Skip invalid dates
                         logger.warning(f"Invalid date in record key {key}: {e}")
                         continue
             
-            if filtered_out > 0:
-                logger.info(f"Filtered out {filtered_out} records outside date range from batch of {len(batch)}")
+            if date_filtered_out > 0:
+                logger.info(f"Date filter: {date_filtered_out} records outside date range from batch of {len(batch)}")
+            
+            if plugin_filtered_out > 0:
+                logger.info(f"Plugin filters: {plugin_filtered_out} records filtered from batch")
             
             # Append filtered batch to extracted data
             self.extracted_data.extend(filtered_batch)
@@ -387,8 +464,8 @@ class ExtractorWrapper:
         })
 
 
-class CloudantExtractorWithCallback(CloudantExtractor):
-    """Extended CloudantExtractor with progress callbacks and data storage"""
+class CloudantExtractorWithCallback(CloudantExtractorAsync):
+    """Extended CloudantExtractorAsync with progress callbacks and data storage"""
     
     def __init__(self, *args, status_callback=None, data_storage_callback=None, total_months=0, **kwargs):
         super().__init__(*args, **kwargs)
@@ -396,8 +473,8 @@ class CloudantExtractorWithCallback(CloudantExtractor):
         self.data_storage_callback = data_storage_callback
         self.total_months_expected = total_months
     
-    def extract_year(self, year, start_month=1, end_month=12):
-        """Override to add progress tracking"""
+    async def extract_year(self, year, start_month=1, end_month=12):
+        """Override to add progress tracking (async)"""
         logger.info(f"=" * 80)
         logger.info(f"Starting extraction for year {year}")
         logger.info(f"Months: {start_month} to {end_month}")
@@ -410,8 +487,8 @@ class CloudantExtractorWithCallback(CloudantExtractor):
             month_start_time = time.time()
             
             try:
-                # Process month data in batches
-                for batch in self._extract_month_data(year, month):
+                # Process month data in batches (async)
+                async for batch in self._extract_month_data(year, month):
                     # Store data if callback provided
                     if self.data_storage_callback:
                         self.data_storage_callback(batch)
@@ -473,6 +550,27 @@ def get_status():
     return jsonify(status)
 
 
+
+@app.route('/api/filters', methods=['GET'])
+def get_filters():
+    """Get list of available filters"""
+    try:
+        # Create a temporary filter manager to get available filters
+        temp_manager = FilterManager()
+        filters = temp_manager.get_available_filters()
+        
+        return jsonify({
+            'success': True,
+            'filters': filters
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting filters: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
 @app.route('/api/retrieve', methods=['POST'])
 def start_retrieval():
     """Start data retrieval job"""
@@ -490,6 +588,22 @@ def start_retrieval():
         data = request.get_json()
         start_date = data.get('start_date')
         end_date = data.get('end_date')
+        filters = data.get('filters', {})  # Get filter configuration
+        batch_size = data.get('batch_size', 3000)  # Get batch size, default 3000
+        
+        # Validate batch size
+        try:
+            batch_size = int(batch_size)
+            if batch_size < 100 or batch_size > 10000:
+                return jsonify({
+                    'success': False,
+                    'error': 'Batch size must be between 100 and 10000'
+                }), 400
+        except (ValueError, TypeError):
+            return jsonify({
+                'success': False,
+                'error': 'Invalid batch size'
+            }), 400
         
         # Validate input
         if not start_date or not end_date:
@@ -498,18 +612,32 @@ def start_retrieval():
                 'error': 'start_date and end_date are required'
             }), 400
         
-        # Validate date format
+        # Validate date format (supports YYYY-MM-DD, YYYY-MM-DD HH:MM, and YYYY-MM-DD HH:MM:SS)
         try:
-            datetime.strptime(start_date, '%Y-%m-%d')
-            datetime.strptime(end_date, '%Y-%m-%d')
+            # Try parsing with full timestamp first
+            try:
+                start_dt = datetime.strptime(start_date, '%Y-%m-%d %H:%M:%S')
+                end_dt = datetime.strptime(end_date, '%Y-%m-%d %H:%M:%S')
+            except ValueError:
+                try:
+                    # Try HH:MM format (append :00 for seconds)
+                    start_dt = datetime.strptime(start_date, '%Y-%m-%d %H:%M')
+                    end_dt = datetime.strptime(end_date, '%Y-%m-%d %H:%M')
+                    # Update the date strings to include seconds for consistency
+                    start_date = start_dt.strftime('%Y-%m-%d %H:%M:%S')
+                    end_date = end_dt.strftime('%Y-%m-%d %H:%M:%S')
+                except ValueError:
+                    # Fall back to date-only format
+                    start_dt = datetime.strptime(start_date, '%Y-%m-%d')
+                    end_dt = datetime.strptime(end_date, '%Y-%m-%d')
         except ValueError:
             return jsonify({
                 'success': False,
-                'error': 'Invalid date format. Use YYYY-MM-DD'
+                'error': 'Invalid date format. Use YYYY-MM-DD, YYYY-MM-DD HH:MM, or YYYY-MM-DD HH:MM:SS'
             }), 400
         
-        # Create extractor wrapper
-        wrapper = ExtractorWrapper(start_date, end_date)
+        # Create extractor wrapper with filter configuration and batch size
+        wrapper = ExtractorWrapper(start_date, end_date, filter_config=filters, batch_size=batch_size)
         
         # Store reference to wrapper for stop functionality
         global current_extractor
@@ -607,37 +735,33 @@ def stop_extraction():
         }), 500
 
 
+def _get_extraction_file_path(filename):
+    """Helper function to get extraction file path with validation"""
+    # Security: Only allow JSON files
+    if not filename.endswith('.json'):
+        return None, 'Invalid file type'
+    
+    # Check extraction directory
+    file_path = os.path.join('backend', 'extractions', filename)
+    
+    if not os.path.exists(file_path):
+        return None, 'File not found'
+    
+    return file_path, None
+
+
 @app.route('/api/download/<filename>', methods=['GET'])
 def download_file(filename):
     """Download extraction file"""
     try:
-        # Security: Only allow downloading from extractions directory
-        # and only JSON files
-        if not filename.endswith('.json'):
+        file_path, error = _get_extraction_file_path(filename)
+        
+        if error or not file_path:
             return jsonify({
                 'success': False,
-                'error': 'Invalid file type'
-            }), 400
+                'error': error or 'File not found'
+            }), 404 if error == 'File not found' else 400
         
-        # Check both possible extraction directories
-        file_paths = [
-            os.path.join('backend', 'extractions', filename),
-            os.path.join('backend', 'backend', 'extractions', filename)
-        ]
-        
-        file_path = None
-        for path in file_paths:
-            if os.path.exists(path):
-                file_path = path
-                break
-        
-        if not file_path:
-            return jsonify({
-                'success': False,
-                'error': 'File not found'
-            }), 404
-        
-        # Send file for download
         return send_file(
             file_path,
             as_attachment=True,
@@ -653,32 +777,82 @@ def download_file(filename):
         }), 500
 
 
+@app.route('/api/view/<filename>', methods=['GET'])
+def view_file(filename):
+    """View extraction file with pagination"""
+    try:
+        file_path, error = _get_extraction_file_path(filename)
+        
+        if error or not file_path:
+            return jsonify({
+                'success': False,
+                'error': error or 'File not found'
+            }), 404 if error == 'File not found' else 400
+        
+        # Get pagination parameters
+        page = request.args.get('page', 1, type=int)
+        page_size = request.args.get('page_size', 100, type=int)
+        
+        # Validate pagination parameters
+        if page < 1:
+            page = 1
+        if page_size < 1 or page_size > 1000:
+            page_size = 100
+        
+        # Read and parse JSON file
+        with open(file_path, 'r') as f:
+            data = json.load(f)
+        
+        # Calculate pagination
+        total_records = len(data)
+        total_pages = (total_records + page_size - 1) // page_size
+        start_idx = (page - 1) * page_size
+        end_idx = start_idx + page_size
+        
+        # Get page data
+        page_data = data[start_idx:end_idx]
+        
+        return jsonify({
+            'success': True,
+            'data': page_data,
+            'pagination': {
+                'page': page,
+                'page_size': page_size,
+                'total_records': total_records,
+                'total_pages': total_pages,
+                'has_next': page < total_pages,
+                'has_prev': page > 1
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Error viewing file: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
 @app.route('/api/extractions', methods=['GET'])
 def list_extractions():
     """List all available extraction files"""
     try:
         extractions = []
+        extraction_dir = os.path.join('backend', 'extractions')
         
-        # Check both possible extraction directories
-        extraction_dirs = [
-            os.path.join('backend', 'extractions'),
-            os.path.join('backend', 'backend', 'extractions')
-        ]
-        
-        for extraction_dir in extraction_dirs:
-            if os.path.exists(extraction_dir):
-                for filename in os.listdir(extraction_dir):
-                    if filename.endswith('.json') and filename.startswith('extraction_'):
-                        file_path = os.path.join(extraction_dir, filename)
-                        file_stats = os.stat(file_path)
-                        
-                        extractions.append({
-                            'filename': filename,
-                            'size': file_stats.st_size,
-                            'size_mb': round(file_stats.st_size / (1024 * 1024), 2),
-                            'created': datetime.fromtimestamp(file_stats.st_ctime).isoformat(),
-                            'modified': datetime.fromtimestamp(file_stats.st_mtime).isoformat()
-                        })
+        if os.path.exists(extraction_dir):
+            for filename in os.listdir(extraction_dir):
+                if filename.endswith('.json') and filename.startswith('extraction_'):
+                    file_path = os.path.join(extraction_dir, filename)
+                    file_stats = os.stat(file_path)
+                    
+                    extractions.append({
+                        'filename': filename,
+                        'size': file_stats.st_size,
+                        'size_mb': round(file_stats.st_size / (1024 * 1024), 2),
+                        'created': datetime.fromtimestamp(file_stats.st_ctime).isoformat(),
+                        'modified': datetime.fromtimestamp(file_stats.st_mtime).isoformat()
+                    })
         
         # Sort by creation time (newest first)
         extractions.sort(key=lambda x: x['created'], reverse=True)
