@@ -24,7 +24,7 @@ import {
   TableCell,
   Pagination
 } from '@carbon/react';
-import { Renew, Download, StopFilled } from '@carbon/icons-react';
+import { Renew, Download, StopFilled, TrashCan } from '@carbon/icons-react';
 import axios from 'axios';
 import './App.scss';
 
@@ -182,6 +182,40 @@ function App() {
       setViewModalOpen(false);
     } finally {
       setViewLoading(false);
+    }
+  };
+
+  // Handle delete history entry
+  const handleDeleteHistory = async (historyId) => {
+    if (!window.confirm('Are you sure you want to delete this history entry and all its associated files?')) {
+      return;
+    }
+
+    try {
+      const response = await axios.delete(`${API_BASE_URL}/history/${historyId}`);
+      
+      if (response.data.success) {
+        setNotification({
+          kind: 'success',
+          title: 'Deleted Successfully',
+          subtitle: `Deleted ${response.data.deleted_count} file(s)`
+        });
+        
+        // Refresh history list
+        fetchHistory();
+      } else {
+        setNotification({
+          kind: 'error',
+          title: 'Delete Failed',
+          subtitle: response.data.error || 'Failed to delete history entry'
+        });
+      }
+    } catch (error) {
+      setNotification({
+        kind: 'error',
+        title: 'Delete Failed',
+        subtitle: error.response?.data?.error || 'Failed to delete history entry'
+      });
     }
   };
 
@@ -645,6 +679,15 @@ function App() {
                           </Button>
                         </>
                       )}
+                      <Button
+                        kind="danger--ghost"
+                        size="sm"
+                        renderIcon={TrashCan}
+                        onClick={() => handleDeleteHistory(entry.id)}
+                        className="history-delete-btn"
+                        iconDescription="Delete"
+                        hasIconOnly
+                      />
                     </div>
                     <div className="history-item-details">
                       <div className="history-detail">

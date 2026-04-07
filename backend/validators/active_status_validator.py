@@ -81,11 +81,17 @@ def validate_active_status(
         # Create output directory
         Path(output_dir).mkdir(parents=True, exist_ok=True)
         
-        # Create output file paths
-        active_file = Path(output_dir) / f"isv_active_users_{timestamp}.json"
-        inactive_file = Path(output_dir) / f"isv_inactive_users_{timestamp}.json"
+        # Create outputs directory for inactive users
+        outputs_dir = Path(output_dir).parent / "outputs"
+        outputs_dir.mkdir(parents=True, exist_ok=True)
         
-        # Save files
+        # Create output file paths
+        # Active users stay in resolutions
+        active_file = Path(output_dir) / f"isv_active_users_{timestamp}.json"
+        # Inactive users go to outputs (always created even if empty)
+        inactive_file = outputs_dir / f"isv_inactive_users_{timestamp}.json"
+        
+        # Save files (always save both, even if empty)
         with open(active_file, 'w') as f:
             json.dump(active_users, f, indent=2)
         

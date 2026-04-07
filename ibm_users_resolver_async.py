@@ -506,13 +506,18 @@ class IBMUsersResolverAsync:
         """
         failed_ids = [uid for uid in all_ids if uid not in resolved_ids]
         
+        # Always create the file, even if empty
+        logger.info(f"Saving {len(failed_ids)} failed IDs to: {output_file}")
+        
+        os.makedirs(os.path.dirname(output_file) or '.', exist_ok=True)
+        
+        with open(output_file, 'w') as f:
+            json.dump(failed_ids, f, indent=2)
+        
         if failed_ids:
-            logger.info(f"Saving {len(failed_ids)} failed IDs to: {output_file}")
-            
-            with open(output_file, 'w') as f:
-                json.dump(failed_ids, f, indent=2)
-            
             logger.warning(f"{len(failed_ids)} IDs could not be resolved")
+        else:
+            logger.info("All IDs were successfully resolved!")
     
     def print_statistics(self):
         """Print resolution statistics"""

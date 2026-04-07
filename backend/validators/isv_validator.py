@@ -111,8 +111,13 @@ async def validate_isv(
         results = await resolver.resolve_all(list(user_ids))
         
         # Create output file paths
+        # Resolved users go to resolutions directory
         resolved_file = Path(output_dir) / f"isv_resolved_users_{timestamp}.json"
-        failed_file = Path(output_dir) / f"isv_failed_ids_{timestamp}.json"
+        
+        # Failed IDs go to outputs directory (always created even if empty)
+        outputs_dir = Path(output_dir).parent / "outputs"
+        outputs_dir.mkdir(parents=True, exist_ok=True)
+        failed_file = outputs_dir / f"isv_failed_ids_{timestamp}.json"
         
         # Save results
         resolver.save_results(results, str(resolved_file))

@@ -268,6 +268,8 @@ class ExtractorWrapper:
                 end_hour=end.hour,
                 end_minute=end.minute
             )
+
+            print(f"DEBUG: extraction done. records={self.extractor.total_records_processed}, months={self.extractor.months_processed}, batches={self.extractor.total_batches_processed}", flush=True)
             
             # Calculate duration
             end_time = time.time()
@@ -312,9 +314,13 @@ class ExtractorWrapper:
             end_time = time.time()
             duration_seconds = int(end_time - start_time)
             
+            print(f"PIPELINE ERROR: {e}", flush=True)
+            import traceback
+            traceback.print_exc()
+
             # Mark as finished with error
             StatusManager.update_status({
-                'status': 'finished',
+                'status': 'failed',
                 'error': str(e),
                 'duration_seconds': duration_seconds,
                 'filters': self.filter_config
@@ -346,9 +352,14 @@ class ExtractorWrapper:
             logger.info(f"Finally block: extraction_successful={hasattr(self, 'extraction_successful')}, value={getattr(self, 'extraction_successful', None)}")
             if hasattr(self, 'extraction_successful') and self.extraction_successful:
                 logger.info("Running validation pipeline...")
-                await self._run_validation_pipeline(self.output_path)
+                try:
+                    await self._run_validation_pipeline(self.output_path)
+                    logger.info("Validation pipeline completed successfully")
+                except Exception as e:
+                    logger.error(f"Validation pipeline failed: {e}", exc_info=True)
+                    # Continue to mark as finished even if validation fails
                 
-                # Mark as finished (successful completion)
+                # Mark as finished (successful completion) - AFTER validation completes
                 logger.info("Updating status to finished...")
                 StatusManager.update_status({
                     'status': 'finished',
@@ -1088,6 +1099,159 @@ def get_history():
         'history': history,
         'count': len(history)
     })
+
+
+@app.route('/api/history/<history_id>', methods=['DELETE'])
+def delete_history_entry(history_id):
+    """
+    Delete a history entry and all its associated files.
+    
+    Deletes files from:
+    - backend/extractions/ (extraction file)
+    - backend/resolutions/ (all files with matching timestamp)
+    - backend/outputs/ (all files with matching timestamp)
+    """
+    try:
+        # Load history
+        history = HistoryManager.load_history()
+        
+        # Find the entry
+        entry = None
+        entry_index = None
+        for i, h in enumerate(history):
+            if h.get('id') == history_id:
+                entry = h
+                entry_index = i
+                break
+        
+        if not entry:
+            return jsonify({
+                'success': False,
+                'error': f'History entry {history_id} not found'
+            }), 404
+        
+        deleted_files = []
+        failed_files = []
+        
+        # 1. Delete extraction file
+        extraction_filename = entry.get('filename')
+        if extraction_filename:
+            extraction_path = os.path.join('backend', 'extractions', extraction_filename)
+            if os.path.exists(extraction_path):
+                try:
+                    os.remove(extraction_path)
+                    deleted_files.append(extraction_path)
+                except Exception as e:
+                    failed_files.append({'file': extraction_path, 'error': str(e)})
+        
+        # 2. Delete all files in resolutions/ with matching timestamp
+        # Extract timestamp from history_id (format: YYYYMMDD_HHMMSS)
+        extraction_filename = entry.get('filename', '')
+        if extraction_filename:
+            # e.g. extraction_20260407_162814.json -> 20260407_162814
+            timestamp = extraction_filename.replace('extraction_', '').replace('.json', '')
+        else:
+            timestamp = history_id  # fallback
+        
+        logger.info(f"Using timestamp from extraction filename: {timestamp}")
+        logger.info(f"=== DELETE OPERATION START ===")
+        logger.info(f"History ID: {history_id}")
+        logger.info(f"Searching for files with timestamp: {timestamp}")
+        logger.info(f"Entry details: {entry}")
+        
+        resolutions_dir = os.path.join('backend','backend', 'resolutions')
+        if os.path.exists(resolutions_dir):
+            logger.info(f"Checking resolutions directory: {resolutions_dir}")
+            for filename in os.listdir(resolutions_dir):
+                if timestamp in filename:
+                    file_path = os.path.join(resolutions_dir, filename)
+                    logger.info(f"Found matching file in resolutions: {filename}")
+                    try:
+                        if os.path.isfile(file_path):
+                            os.remove(file_path)
+                            deleted_files.append(file_path)
+                            logger.info(f"Deleted: {file_path}")
+                    except Exception as e:
+                        logger.error(f"Failed to delete {file_path}: {e}")
+                        failed_files.append({'file': file_path, 'error': str(e)})
+        else:
+            logger.warning(f"Resolutions directory does not exist: {resolutions_dir}")
+        
+        # 3. Delete all files in outputs/ with matching timestamp
+        outputs_dir = os.path.join('backend','backend', 'outputs')
+        if os.path.exists(outputs_dir):
+            logger.info(f"Checking outputs directory: {outputs_dir}")
+            for filename in os.listdir(outputs_dir):
+                if timestamp in filename:
+                    file_path = os.path.join(outputs_dir, filename)
+                    logger.info(f"Found matching file in outputs: {filename}")
+                    try:
+                        if os.path.isfile(file_path):
+                            os.remove(file_path)
+                            deleted_files.append(file_path)
+                            logger.info(f"Deleted: {file_path}")
+                    except Exception as e:
+                        logger.error(f"Failed to delete {file_path}: {e}")
+                        failed_files.append({'file': file_path, 'error': str(e)})
+        else:
+            logger.warning(f"Outputs directory does not exist: {outputs_dir}")
+        
+        # 4. Delete all files in backend/backend/resolutions/ with matching timestamp
+        backend_resolutions_dir = os.path.join('backend', 'backend', 'resolutions')
+        if os.path.exists(backend_resolutions_dir):
+            logger.info(f"Checking backend/backend/resolutions directory: {backend_resolutions_dir}")
+            for filename in os.listdir(backend_resolutions_dir):
+                if timestamp in filename:
+                    file_path = os.path.join(backend_resolutions_dir, filename)
+                    logger.info(f"Found matching file in backend/backend/resolutions: {filename}")
+                    try:
+                        if os.path.isfile(file_path):
+                            os.remove(file_path)
+                            deleted_files.append(file_path)
+                            logger.info(f"Deleted: {file_path}")
+                    except Exception as e:
+                        logger.error(f"Failed to delete {file_path}: {e}")
+                        failed_files.append({'file': file_path, 'error': str(e)})
+        
+        # 5. Delete all files in backend/backend/outputs/ with matching timestamp
+        backend_outputs_dir = os.path.join('backend', 'backend', 'outputs')
+        if os.path.exists(backend_outputs_dir):
+            logger.info(f"Checking backend/backend/outputs directory: {backend_outputs_dir}")
+            for filename in os.listdir(backend_outputs_dir):
+                if timestamp in filename:
+                    file_path = os.path.join(backend_outputs_dir, filename)
+                    logger.info(f"Found matching file in backend/backend/outputs: {filename}")
+                    try:
+                        if os.path.isfile(file_path):
+                            os.remove(file_path)
+                            deleted_files.append(file_path)
+                            logger.info(f"Deleted: {file_path}")
+                    except Exception as e:
+                        logger.error(f"Failed to delete {file_path}: {e}")
+                        failed_files.append({'file': file_path, 'error': str(e)})
+        
+        logger.info(f"Total files deleted: {len(deleted_files)}")
+        logger.info(f"Total files failed: {len(failed_files)}")
+        
+        # Remove entry from history
+        history.pop(entry_index)
+        HistoryManager.save_history(history)
+        
+        return jsonify({
+            'success': True,
+            'message': f'History entry {history_id} deleted',
+            'deleted_files': deleted_files,
+            'deleted_count': len(deleted_files),
+            'failed_files': failed_files,
+            'failed_count': len(failed_files)
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
 
 # ============================================================================
 # User Filtering API Endpoints

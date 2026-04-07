@@ -69,7 +69,7 @@ async def check_bluepages_email(email: str, session: aiohttp.ClientSession,
             return False, f"Unexpected error: {str(e)}"
 
 
-async def process_batch(users: List[Dict], session: aiohttp.ClientSession, 
+async def process_batch(users: List[Dict], session: aiohttp.ClientSession,
                        semaphore: asyncio.Semaphore) -> Tuple[List[Dict], List[Dict]]:
     """
     Process a batch of users concurrently.
@@ -79,19 +79,37 @@ async def process_batch(users: List[Dict], session: aiohttp.ClientSession,
     """
     tasks = []
     for user in users:
-        task = check_bluepages_email(user['email'], session, semaphore)
-        tasks.append((user, task))
+        email = user.get('email', '')
+        
+        # Skip mail.test.*.ibm.com emails - treat them as "to be deleted"
+        if email and 'mail.test.' in email and email.endswith('.ibm.com'):
+            # Don't check bluepages, automatically mark for deletion
+            tasks.append((user, None))
+        else:
+            task = check_bluepages_email(email, session, semaphore)
+            tasks.append((user, task))
     
-    results = await asyncio.gather(*[task for _, task in tasks])
+    # Gather only the non-None tasks
+    tasks_to_run = [task for _, task in tasks if task is not None]
+    results = await asyncio.gather(*tasks_to_run) if tasks_to_run else []
     
     to_be_deleted = []
     not_to_delete = []
     
-    for (user, _), (exists, status) in zip(tasks, results):
-        if exists:
-            not_to_delete.append(user)
-        else:
+    result_idx = 0
+    for user, task in tasks:
+        if task is None:
+            # This was a mail.test.*.ibm.com email - mark for deletion
             to_be_deleted.append(user)
+        else:
+            # Get the result from the gathered results
+            exists, status = results[result_idx]
+            result_idx += 1
+            
+            if exists:
+                not_to_delete.append(user)
+            else:
+                to_be_deleted.append(user)
     
     return to_be_deleted, not_to_delete
 
