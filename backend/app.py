@@ -1240,6 +1240,11 @@ def delete_history_entry(history_id):
         # This handles cases where validation pipeline creates files a few seconds after extraction
         timestamp_prefix = full_timestamp[:13] if len(full_timestamp) >= 13 else full_timestamp  # YYYYMMDD_HHMM
         
+        print(f"=== DELETE OPERATION START ===")
+        print(f"History ID: {history_id}")
+        print(f"Full timestamp: {full_timestamp}")
+        print(f"Timestamp prefix for matching: {timestamp_prefix}")
+        print(f"Entry: {entry}")
         logger.info(f"=== DELETE OPERATION START ===")
         logger.info(f"History ID: {history_id}")
         logger.info(f"Full timestamp: {full_timestamp}")
@@ -1256,34 +1261,49 @@ def delete_history_entry(history_id):
         # Delete files from all directories
         for dir_path, dir_name in directories_to_check:
             if os.path.exists(dir_path):
+                print(f"Checking {dir_name} directory: {dir_path}")
                 logger.info(f"Checking {dir_name} directory: {dir_path}")
                 try:
-                    for filename in os.listdir(dir_path):
+                    files_in_dir = os.listdir(dir_path)
+                    print(f"Files in {dir_name}: {files_in_dir}")
+                    for filename in files_in_dir:
                         # Match files containing the timestamp prefix (matches files within same minute)
                         if timestamp_prefix in filename:
                             file_path = os.path.join(dir_path, filename)
+                            print(f"Found matching file in {dir_name}: {filename}")
                             logger.info(f"Found matching file in {dir_name}: {filename}")
                             try:
                                 if os.path.isfile(file_path):
+                                    print(f"Attempting to delete: {file_path}")
                                     os.remove(file_path)
                                     deleted_files.append(file_path)
+                                    print(f"✓ Deleted: {file_path}")
                                     logger.info(f"✓ Deleted: {file_path}")
                             except Exception as e:
+                                print(f"✗ Failed to delete {file_path}: {e}")
                                 logger.error(f"✗ Failed to delete {file_path}: {e}")
                                 failed_files.append({'file': file_path, 'error': str(e)})
                 except Exception as e:
+                    print(f"Error scanning {dir_name} directory: {e}")
                     logger.error(f"Error scanning {dir_name} directory: {e}")
                     failed_files.append({'directory': dir_path, 'error': str(e)})
             else:
+                print(f"{dir_name} directory does not exist: {dir_path}")
                 logger.warning(f"{dir_name} directory does not exist: {dir_path}")
         
+        print(f"=== DELETE OPERATION COMPLETE ===")
+        print(f"Total files deleted: {len(deleted_files)}")
+        print(f"Total files failed: {len(failed_files)}")
+        print(f"Deleted files: {deleted_files}")
+        print(f"Failed files: {failed_files}")
         logger.info(f"=== DELETE OPERATION COMPLETE ===")
         logger.info(f"Total files deleted: {len(deleted_files)}")
         logger.info(f"Total files failed: {len(failed_files)}")
         
         # Remove entry from history
-        history.pop(entry_index)
-        HistoryManager.save_history(history)
+        if entry_index is not None:
+            history.pop(entry_index)
+            HistoryManager.save_history(history)
         
         return jsonify({
             'success': True,

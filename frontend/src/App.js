@@ -149,6 +149,44 @@ function App() {
     }
   };
 
+  // Handle delete history
+  const handleDeleteHistory = async (historyId) => {
+    if (!window.confirm('Are you sure you want to delete this extraction and all its associated files?')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/history/${historyId}`, {
+        method: 'DELETE',
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setNotification({
+          kind: 'success',
+          title: 'Deletion Successful',
+          subtitle: `Deleted ${data.deleted_count} file(s). ${data.failed_count > 0 ? `Failed to delete ${data.failed_count} file(s).` : ''}`,
+        });
+        // Refresh history
+        fetchHistory();
+      } else {
+        setNotification({
+          kind: 'error',
+          title: 'Deletion Failed',
+          subtitle: data.error || 'Failed to delete history entry',
+        });
+      }
+    } catch (error) {
+      console.error('Error deleting history:', error);
+      setNotification({
+        kind: 'error',
+        title: 'Deletion Error',
+        subtitle: error.message,
+      });
+    }
+  };
+
   // Fetch available filters
   const fetchFilters = useCallback(async () => {
     try {
@@ -200,40 +238,6 @@ function App() {
       setViewModalOpen(false);
     } finally {
       setViewLoading(false);
-    }
-  };
-
-  // Handle delete history entry
-  const handleDeleteHistory = async (historyId) => {
-    if (!window.confirm('Are you sure you want to delete this history entry and all its associated files?')) {
-      return;
-    }
-
-    try {
-      const response = await axios.delete(`${API_BASE_URL}/history/${historyId}`);
-      
-      if (response.data.success) {
-        setNotification({
-          kind: 'success',
-          title: 'Deleted Successfully',
-          subtitle: `Deleted ${response.data.deleted_count} file(s)`
-        });
-        
-        // Refresh history list
-        fetchHistory();
-      } else {
-        setNotification({
-          kind: 'error',
-          title: 'Delete Failed',
-          subtitle: response.data.error || 'Failed to delete history entry'
-        });
-      }
-    } catch (error) {
-      setNotification({
-        kind: 'error',
-        title: 'Delete Failed',
-        subtitle: error.response?.data?.error || 'Failed to delete history entry'
-      });
     }
   };
 
@@ -780,9 +784,9 @@ function App() {
                         renderIcon={TrashCan}
                         onClick={() => handleDeleteHistory(entry.id)}
                         className="history-delete-btn"
-                        iconDescription="Delete"
-                        hasIconOnly
-                      />
+                      >
+                        Delete
+                      </Button>
                     </div>
                     <div className="history-item-details">
                       <div className="history-detail">

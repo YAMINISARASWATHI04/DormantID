@@ -1,22 +1,7 @@
 {
-  "processed_count": 6,
-  "timestamp": "2026-04-10T15:12:00.030380",
+  "processed_count": 3,
+  "timestamp": "2026-04-10T15:30:18.656581",
   "results": {
-    "120000QH27": {
-      "email": "clifbm@co.warren.oh.us",
-      "lastLogin": "2022-04-01T12:02:53Z",
-      "active": true
-    },
-    "1100004XRY": {
-      "email": "nsi5ct",
-      "lastLogin": "2022-04-01T01:14:04Z",
-      "active": true
-    },
-    "2700022BES": {
-      "email": "sushant.chalke@mosaicco.com",
-      "lastLogin": "2022-04-01T15:32:55Z",
-      "active": true
-    },
     "0600017MEM": {
       "email": "t.mansoor@csuohio.edu",
       "lastLogin": "2022-04-01T13:50:57Z",
