@@ -55,13 +55,24 @@ function App() {
   const fetchStatus = useCallback(async () => {
     try {
       const response = await axios.get(`${API_BASE_URL}/status`);
-      setStatus(response.data);
+      console.log('Fetched status:', response.data); // Debug log
+      const newStatus = response.data;
+      
+      // Update status state
+      setStatus(prevStatus => {
+        // If transitioning from under_processing to finished/stopped/failed,
+        // keep polling for one more cycle to ensure UI updates
+        if (prevStatus?.status === 'under_processing' &&
+            newStatus.status !== 'under_processing') {
+          console.log('Status transition detected, will stop polling after next cycle');
+          setTimeout(() => setPolling(false), 3000);
+        }
+        return newStatus;
+      });
       
       // Start polling if under processing
-      if (response.data.status === 'under_processing' && !polling) {
+      if (newStatus.status === 'under_processing') {
         setPolling(true);
-      } else if (response.data.status !== 'under_processing' && polling) {
-        setPolling(false);
       }
     } catch (error) {
       console.error('Error fetching status:', error);
@@ -71,7 +82,7 @@ function App() {
         subtitle: 'Failed to fetch status from server'
       });
     }
-  }, [polling]);
+  }, []); // Remove polling dependency to avoid stale closure
 
   // Fetch history from API
   const fetchHistory = useCallback(async () => {
@@ -255,14 +266,25 @@ function App() {
   useEffect(() => {
     let interval;
     if (polling) {
+      console.log('Starting polling...'); // Debug log
       interval = setInterval(() => {
+        console.log('Polling status...'); // Debug log
         fetchStatus();
-      }, 5000); // Poll every 5 seconds
+        // Also refresh history during polling to catch completed jobs
+        fetchHistory();
+      }, 3000); // Poll every 3 seconds (faster updates)
+    } else {
+      console.log('Polling stopped'); // Debug log
+      // Fetch history one final time when polling stops
+      fetchHistory();
     }
     return () => {
-      if (interval) clearInterval(interval);
+      if (interval) {
+        console.log('Clearing polling interval'); // Debug log
+        clearInterval(interval);
+      }
     };
-  }, [polling, fetchStatus]);
+  }, [polling, fetchStatus, fetchHistory]);
 
   // Handle form submission
   const handleSubmit = async () => {
@@ -500,9 +522,10 @@ function App() {
               <div className="status-row">
                 <span className="status-label">Status:</span>
                 {getStatusTag()}
+                {polling && <InlineLoading description="Updating..." style={{ marginLeft: '1rem' }} />}
               </div>
 
-              {status.status === 'under_processing' && (
+              {(status.status === 'under_processing' || isProcessing) && (
                 <>
                   <div className="status-row">
                     <span className="status-label">Current Month:</span>
