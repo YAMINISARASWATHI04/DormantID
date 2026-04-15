@@ -402,6 +402,18 @@ class ExtractorWrapper:
             logger.info(f"Finally block: extraction_successful={hasattr(self, 'extraction_successful')}, value={getattr(self, 'extraction_successful', None)}, stop_requested={self.stop_requested}")
             if hasattr(self, 'extraction_successful') and self.extraction_successful and not self.stop_requested:
                 logger.info("Running validation pipeline...")
+                # Update status to show validation is starting
+                StatusManager.update_status({
+                    'status': 'validating',
+                    'current_step': 'Starting validation pipeline',
+                    'validation_progress': {
+                        'extraction': 'completed',
+                        'isv_validation': 'pending',
+                        'dormancy_check': 'pending',
+                        'last_login_check': 'pending',
+                        'bluepages_check': 'pending'
+                    }
+                })
                 try:
                     await self._run_validation_pipeline(self.output_path)
                     logger.info("Validation pipeline completed successfully")
@@ -410,15 +422,23 @@ class ExtractorWrapper:
                     # Continue to mark as finished even if validation fails
             elif self.stop_requested:
                 logger.info("Skipping validation pipeline because extraction was stopped")
-                
-                # Mark as finished (successful completion) - AFTER validation completes
+            
+            # Mark as finished (successful completion) - AFTER validation completes
+            # This runs for both successful completion and stopped extraction
+            if hasattr(self, 'extraction_successful') and self.extraction_successful:
                 logger.info("Updating status to finished...")
-                StatusManager.update_status({
+                # Preserve validation_progress when transitioning to finished
+                current_status = StatusManager.load_status()
+                update_data = {
                     'status': 'finished',
                     'error': None,
                     'duration_seconds': self.duration_seconds,
                     'filters': self.filter_config
-                })
+                }
+                # Keep validation_progress if it exists
+                if 'validation_progress' in current_status:
+                    update_data['validation_progress'] = current_status['validation_progress']
+                StatusManager.update_status(update_data)
                 
                 # Add to history
                 logger.info("Adding to history...")
@@ -670,10 +690,48 @@ class ExtractorWrapper:
             output_dir = os.path.join('backend', 'resolutions')
             os.makedirs(output_dir, exist_ok=True)
             
+            # Create status update callback
+            def update_validation_status(step, step_status):
+                """Callback to update status during validation"""
+                # Map step names to validation_progress keys
+                # Note: Using keys that match the initial validation_progress structure
+                step_mapping = {
+                    'ISV Validation': 'isv_validation',
+                    'Dormancy Check': 'dormancy_check',
+                    'Last Login Check': 'last_login_check',
+                    'BluPages Validation': 'bluepages_check'  # Changed to match initial structure
+                }
+                
+                # Get current status to preserve validation_progress
+                current_status = StatusManager.load_status()
+                validation_progress = current_status.get('validation_progress', {
+                    'extraction': 'completed',
+                    'isv_validation': 'pending',
+                    'dormancy_check': 'pending',
+                    'last_login_check': 'pending',
+                    'bluepages_check': 'pending'  # Changed to match initial structure
+                })
+                
+                # Update the specific step status
+                progress_key = step_mapping.get(step)
+                if progress_key:
+                    if step_status == 'running':
+                        validation_progress[progress_key] = 'running'
+                    elif step_status == 'completed':
+                        validation_progress[progress_key] = 'completed'
+                
+                StatusManager.update_status({
+                    'status': 'validating',
+                    'current_step': step,
+                    'validation_step_status': step_status,
+                    'validation_progress': validation_progress
+                })
+            
             result = await validators.run_validation_pipeline(
                 input_file=extraction_file,
                 output_dir=output_dir,
                 checks=checks,
+                status_callback=update_validation_status,
                 days_threshold=1095,  # 3 years
                 max_concurrent=int(os.getenv('MAX_CONCURRENT', '50')),
                 batch_size=int(os.getenv('RESOLUTION_BATCH_SIZE', '100'))

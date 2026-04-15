@@ -65,18 +65,18 @@ function App() {
       
       // Update status state
       setStatus(prevStatus => {
-        // If transitioning from under_processing to finished/stopped/failed,
+        // If transitioning from processing/validating to finished/stopped/failed,
         // stop polling immediately
-        if (prevStatus?.status === 'under_processing' &&
-            newStatus.status !== 'under_processing') {
+        if ((prevStatus?.status === 'under_processing' || prevStatus?.status === 'validating') &&
+            (newStatus.status === 'finished' || newStatus.status === 'stopped' || newStatus.status === 'failed')) {
           console.log('Status transition detected, stopping polling');
           setPolling(false);
         }
         return newStatus;
       });
       
-      // Start polling if under processing, stop if not
-      if (newStatus.status === 'under_processing') {
+      // Start polling if under processing or validating, stop if finished/stopped/failed
+      if (newStatus.status === 'under_processing' || newStatus.status === 'validating') {
         setPolling(true);
       } else if (newStatus.status === 'finished' || newStatus.status === 'stopped' || newStatus.status === 'failed') {
         setPolling(false);
@@ -440,6 +440,7 @@ function App() {
     const statusConfig = {
       not_started: { type: 'gray', text: 'Not Started' },
       under_processing: { type: 'blue', text: 'Processing' },
+      validating: { type: 'blue', text: 'Validating' },
       stopped: { type: 'purple', text: 'Stopped' },
       finished: {
         type: status.error ? 'red' : 'green',
@@ -456,7 +457,7 @@ function App() {
     );
   };
 
-  const isProcessing = status?.status === 'under_processing';
+  const isProcessing = status?.status === 'under_processing' || status?.status === 'validating';
   const isDisabled = isProcessing || loading;
   const canStop = isProcessing || loading || polling;
 
@@ -671,6 +672,51 @@ function App() {
                 </>
               )}
 
+              {status.status === 'validating' && (
+                <>
+                  <div className="status-row">
+                    <span className="status-label">Current Step:</span>
+                    <span className="status-value">{status.current_step || 'Validating...'}</span>
+                  </div>
+                  
+                  {status.validation_progress && (
+                    <div className="validation-progress">
+                      <h4>Validation Steps:</h4>
+                      <div className="validation-steps">
+                        <div className="validation-step">
+                          <Tag type="green">✓</Tag>
+                          <span>Extraction Completed</span>
+                        </div>
+                        <div className="validation-step">
+                          <Tag type={status.validation_step_status === 'completed' && status.current_step === 'ISV Validation' ? 'green' : status.current_step === 'ISV Validation' ? 'blue' : 'gray'}>
+                            {status.validation_step_status === 'completed' && status.current_step === 'ISV Validation' ? '✓' : status.current_step === 'ISV Validation' ? '...' : '○'}
+                          </Tag>
+                          <span>ISV Validation</span>
+                        </div>
+                        <div className="validation-step">
+                          <Tag type={status.validation_step_status === 'completed' && status.current_step === 'Dormancy Check' ? 'green' : status.current_step === 'Dormancy Check' ? 'blue' : 'gray'}>
+                            {status.validation_step_status === 'completed' && status.current_step === 'Dormancy Check' ? '✓' : status.current_step === 'Dormancy Check' ? '...' : '○'}
+                          </Tag>
+                          <span>Dormancy Check</span>
+                        </div>
+                        <div className="validation-step">
+                          <Tag type={status.validation_step_status === 'completed' && status.current_step === 'Last Login Check' ? 'green' : status.current_step === 'Last Login Check' ? 'blue' : 'gray'}>
+                            {status.validation_step_status === 'completed' && status.current_step === 'Last Login Check' ? '✓' : status.current_step === 'Last Login Check' ? '...' : '○'}
+                          </Tag>
+                          <span>Last Login Check</span>
+                        </div>
+                        <div className="validation-step">
+                          <Tag type={status.validation_step_status === 'completed' && status.current_step === 'BluPages Validation' ? 'green' : status.current_step === 'BluPages Validation' ? 'blue' : 'gray'}>
+                            {status.validation_step_status === 'completed' && status.current_step === 'BluPages Validation' ? '✓' : status.current_step === 'BluPages Validation' ? '...' : '○'}
+                          </Tag>
+                          <span>BluPages Validation</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+
               {status.status === 'finished' && !status.error && (
                 <>
                   <div className="status-row">
@@ -710,6 +756,45 @@ function App() {
                       </span>
                     </div>
                   )}
+                  
+                  {status.validation_progress && (
+                    <div className="validation-progress">
+                      <h4>Validation Steps:</h4>
+                      <div className="validation-steps">
+                        <div className="validation-step">
+                          <Tag type={status.validation_progress.extraction === 'completed' ? 'green' : 'gray'}>
+                            {status.validation_progress.extraction === 'completed' ? '✓' : '○'}
+                          </Tag>
+                          <span>Extraction Completed</span>
+                        </div>
+                        <div className="validation-step">
+                          <Tag type={status.validation_progress.isv_validation === 'completed' ? 'green' : 'gray'}>
+                            {status.validation_progress.isv_validation === 'completed' ? '✓' : '○'}
+                          </Tag>
+                          <span>ISV Validation</span>
+                        </div>
+                        <div className="validation-step">
+                          <Tag type={status.validation_progress.dormancy_check === 'completed' ? 'green' : 'gray'}>
+                            {status.validation_progress.dormancy_check === 'completed' ? '✓' : '○'}
+                          </Tag>
+                          <span>Dormancy Check</span>
+                        </div>
+                        <div className="validation-step">
+                          <Tag type={status.validation_progress.last_login_check === 'completed' ? 'green' : 'gray'}>
+                            {status.validation_progress.last_login_check === 'completed' ? '✓' : '○'}
+                          </Tag>
+                          <span>Last Login Check</span>
+                        </div>
+                        <div className="validation-step">
+                          <Tag type={status.validation_progress.bluepages_check === 'completed' ? 'green' : 'gray'}>
+                            {status.validation_progress.bluepages_check === 'completed' ? '✓' : '○'}
+                          </Tag>
+                          <span>BluPages Validation</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
                   {status.output_file && (
                     <div className="status-row">
                       <Button
