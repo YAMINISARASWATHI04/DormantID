@@ -640,7 +640,7 @@ function App() {
                     {/* Start Time */}
                     <TimePicker
                       id="start-time"
-                      labelText={<Time size={16} />}
+                      labelText={<span><Time size={16} style={{marginRight: '4px', verticalAlign: 'middle'}} /> Time</span>}
                       value={startTime}
                       onChange={(e) => setStartTime(e.target.value)}
                       disabled={isDisabled}
@@ -676,7 +676,7 @@ function App() {
                     {/* End Time */}
                     <TimePicker
                       id="end-time"
-                      labelText={<Time size={16} />}
+                      labelText={<span><Time size={16} style={{marginRight: '4px', verticalAlign: 'middle'}} /> Time</span>}
                       value={endTime}
                       onChange={(e) => setEndTime(e.target.value)}
                       disabled={isDisabled}
@@ -820,11 +820,26 @@ function App() {
                   <div className="status-row">
                     <span className="status-label">{status.status === 'finished' ? 'Total Duration:' : 'Elapsed Time:'}</span>
                     <span className="status-value">
-                      {status.status === 'finished' && finalDuration !== null ? (
+                      {status.status === 'finished' ? (
                         (() => {
-                          const minutes = Math.floor(finalDuration / 60);
-                          const seconds = finalDuration % 60;
-                          return finalDuration >= 60 ? `${minutes}m ${seconds}s` : `${finalDuration}s`;
+                          // For finished status, use finalDuration or calculate from end_time/start_time
+                          let duration = finalDuration;
+                          if (duration === null) {
+                            if (status.duration_seconds) {
+                              duration = status.duration_seconds;
+                            } else if (status.end_time && status.start_time) {
+                              duration = status.end_time - status.start_time;
+                            } else if (status.start_time) {
+                              // Fallback: calculate once but don't use Date.now() for finished jobs
+                              duration = Math.floor(Date.now() / 1000 - status.start_time);
+                            }
+                          }
+                          if (duration !== null) {
+                            const minutes = Math.floor(duration / 60);
+                            const seconds = duration % 60;
+                            return duration >= 60 ? `${minutes}m ${seconds}s` : `${duration}s`;
+                          }
+                          return 'N/A';
                         })()
                       ) : status.start_time ? (
                         (() => {
