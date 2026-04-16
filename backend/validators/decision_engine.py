@@ -51,7 +51,7 @@ def consolidate_decisions(
         
         # Generate output file path if not provided
         if output_file is None:
-            output_file = f"backend/outputs/dormant_id_decisions_{timestamp}.json"
+            output_file = f"backend/backend/outputs/dormant_id_decisions_{timestamp}.json"
         
         # Initialize decision categories
         decisions = {

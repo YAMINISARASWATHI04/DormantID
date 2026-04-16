@@ -13,16 +13,6 @@ import {
   Checkbox,
   TimePicker,
   NumberInput,
-  Modal,
-  DataTable,
-  TableContainer,
-  Table,
-  TableHead,
-  TableRow,
-  TableHeader,
-  TableBody,
-  TableCell,
-  Pagination,
   RadioButtonGroup,
   RadioButton,
   TextArea,
@@ -49,11 +39,6 @@ function App() {
   const [polling, setPolling] = useState(false);
   const [availableFilters, setAvailableFilters] = useState([]);
   const [selectedFilters, setSelectedFilters] = useState({});
-  const [viewModalOpen, setViewModalOpen] = useState(false);
-  const [viewData, setViewData] = useState([]);
-  const [viewPagination, setViewPagination] = useState(null);
-  const [viewFilename, setViewFilename] = useState('');
-  const [viewLoading, setViewLoading] = useState(false);
   const [finalDuration, setFinalDuration] = useState(null);
   const [datePickerKey, setDatePickerKey] = useState(0);
 
@@ -302,60 +287,9 @@ function App() {
   };
 
   // Handle view data
-  const handleViewData = async (filename) => {
-    setViewFilename(filename);
-    setViewModalOpen(true);
-    setViewLoading(true);
-    
-    try {
-      const response = await axios.get(`${API_BASE_URL}/view/${filename}`, {
-        params: { page: 1, page_size: 100 }
-      });
-      
-      if (response.data.success) {
-        setViewData(response.data.data);
-        setViewPagination(response.data.pagination);
-      } else {
-        setNotification({
-          kind: 'error',
-          title: 'Error',
-          subtitle: 'Failed to load data'
-        });
-        setViewModalOpen(false);
-      }
-    } catch (error) {
-      setNotification({
-        kind: 'error',
-        title: 'Error',
-        subtitle: error.response?.data?.error || 'Failed to load data'
-      });
-      setViewModalOpen(false);
-    } finally {
-      setViewLoading(false);
-    }
-  };
-
-  // Handle page change in data viewer
-  const handlePageChange = async ({ page, pageSize }) => {
-    setViewLoading(true);
-    
-    try {
-      const response = await axios.get(`${API_BASE_URL}/view/${viewFilename}`, {
-        params: { page, page_size: pageSize }
-      });
-      
-      if (response.data.success) {
-        setViewData(response.data.data);
-        setViewPagination(response.data.pagination);
-      }
-    } catch (error) {
-      setNotification({
-        kind: 'error',
-        title: 'Error',
-        subtitle: 'Failed to load page'
-      });
-    } finally {
-      setViewLoading(false);
+  const handleViewData = (filename) => {
+    if (filename) {
+      window.open(`/view?file=${encodeURIComponent(filename)}`, '_blank');
     }
   };
 
@@ -1106,82 +1040,6 @@ function App() {
         </div>
       </div>
 
-      {/* Data Viewer Modal */}
-      <Modal
-        open={viewModalOpen}
-        onRequestClose={() => setViewModalOpen(false)}
-        modalHeading={`Viewing: ${viewFilename}`}
-        passiveModal
-        size="lg"
-      >
-        {viewLoading ? (
-          <div style={{ padding: '2rem', textAlign: 'center' }}>
-            <InlineLoading description="Loading data..." />
-          </div>
-        ) : viewData.length > 0 ? (
-          <>
-            <DataTable
-              rows={viewData.map((item, idx) => ({
-                id: `row-${viewPagination.page}-${idx}`,
-                ...item
-              }))}
-              headers={
-                viewData.length > 0
-                  ? Object.keys(viewData[0]).map(key => ({
-                      key,
-                      header: key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' ')
-                    }))
-                  : []
-              }
-            >
-              {({ rows, headers, getTableProps, getHeaderProps, getRowProps }) => (
-                <TableContainer>
-                  <Table {...getTableProps()}>
-                    <TableHead>
-                      <TableRow>
-                        {headers.map(header => (
-                          <TableHeader {...getHeaderProps({ header })}>
-                            {header.header}
-                          </TableHeader>
-                        ))}
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {rows.map(row => (
-                        <TableRow {...getRowProps({ row })}>
-                          {row.cells.map(cell => (
-                            <TableCell key={cell.id}>
-                              {typeof cell.value === 'object'
-                                ? JSON.stringify(cell.value)
-                                : cell.value}
-                            </TableCell>
-                          ))}
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-              )}
-            </DataTable>
-            <div style={{ marginTop: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                Showing {((viewPagination.page - 1) * viewPagination.page_size) + 1} - {Math.min(viewPagination.page * viewPagination.page_size, viewPagination.total_records)} of {viewPagination.total_records} records
-              </div>
-              <Pagination
-                page={viewPagination.page}
-                totalItems={viewPagination.total_records}
-                pageSize={viewPagination.page_size}
-                pageSizes={[100, 250, 500, 1000]}
-                onChange={handlePageChange}
-              />
-            </div>
-          </>
-        ) : (
-          <div style={{ padding: '2rem', textAlign: 'center' }}>
-            <p>No data available</p>
-          </div>
-        )}
-      </Modal>
     </div>
   );
 }

@@ -435,13 +435,17 @@ class ExtractorWrapper:
                 # Recalculate duration to include validation time
                 total_duration = int(time.time() - start_time)
                 
+                # Use decision file if available, otherwise use extraction file
+                output_file = getattr(self, 'decision_file', self.output_filename)
+                
                 # Preserve validation_progress when transitioning to finished
                 current_status = StatusManager.load_status()
                 update_data = {
                     'status': 'finished',
                     'error': None,
                     'duration_seconds': total_duration,
-                    'filters': self.filter_config
+                    'filters': self.filter_config,
+                    'output_file': output_file  # Update to use decision file
                 }
                 # Keep validation_progress if it exists
                 if 'validation_progress' in current_status:
@@ -450,8 +454,6 @@ class ExtractorWrapper:
                 
                 # Add to history
                 logger.info("Adding to history...")
-                # Use decision file if available, otherwise use extraction file
-                output_file = getattr(self, 'decision_file', self.output_filename)
                 HistoryManager.add_history_entry({
                     'id': datetime.now().strftime('%Y%m%d_%H%M%S'),
                     'start_date': self.start_date,
@@ -1116,7 +1118,8 @@ def _get_extraction_file_path(filename):
     
     # Check only the correct directories (using absolute paths)
     directories = [
-        os.path.join(backend_dir, 'backend', 'outputs'),  # Decision and output files
+        os.path.join(backend_dir, 'backend', 'backend', 'outputs'),  # Decision and output files (nested path)
+        os.path.join(backend_dir, 'backend', 'outputs'),  # Decision and output files (alternative path)
         os.path.join(backend_dir, 'backend', 'extractions'),  # Extraction files
     ]
     
