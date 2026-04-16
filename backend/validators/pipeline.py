@@ -237,7 +237,13 @@ async def run_validation_pipeline(
             # Add non-IBM users directly to to_be_deleted (per flowchart: remaining mails go to "To be deleted")
             if non_ibm_users:
                 # Use the same outputs directory structure
-                outputs_dir = Path("backend/backend/outputs")
+                # Get absolute path to project root
+                import os
+                current_file = os.path.abspath(__file__)
+                validators_dir = os.path.dirname(current_file)
+                backend_dir = os.path.dirname(validators_dir)
+                project_root = os.path.dirname(backend_dir)
+                outputs_dir = Path(project_root) / "backend" / "outputs"
                 outputs_dir.mkdir(parents=True, exist_ok=True)
                 to_delete_file = outputs_dir / f"to_be_deleted_{timestamp}.json"
                 
@@ -283,7 +289,13 @@ async def run_validation_pipeline(
                 summary["not_to_delete"] = summary.get("recent_login", 0)
                 
                 # Non-IBM users already added to to_be_deleted file above
-                outputs_dir = Path("backend/backend/outputs")
+                # Get absolute path to project root
+                import os
+                current_file = os.path.abspath(__file__)
+                validators_dir = os.path.dirname(current_file)
+                backend_dir = os.path.dirname(validators_dir)
+                project_root = os.path.dirname(backend_dir)
+                outputs_dir = Path(project_root) / "backend" / "outputs"
                 outputs_dir.mkdir(parents=True, exist_ok=True)
                 to_delete_file = outputs_dir / f"to_be_deleted_{timestamp}.json"
                 

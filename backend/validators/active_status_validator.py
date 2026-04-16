@@ -82,7 +82,13 @@ def validate_active_status(
         Path(output_dir).mkdir(parents=True, exist_ok=True)
         
         # Create outputs directory for inactive users
-        outputs_dir = Path("backend/backend/outputs")
+        # Use absolute path
+        import os
+        current_file = os.path.abspath(__file__)
+        validators_dir = os.path.dirname(current_file)
+        backend_dir = os.path.dirname(validators_dir)
+        project_root = os.path.dirname(backend_dir)
+        outputs_dir = Path(project_root) / "backend" / "outputs"
         outputs_dir.mkdir(parents=True, exist_ok=True)
         
         # Create output file paths

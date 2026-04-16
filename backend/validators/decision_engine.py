@@ -51,7 +51,13 @@ def consolidate_decisions(
         
         # Generate output file path if not provided
         if output_file is None:
-            output_file = f"backend/backend/outputs/dormant_id_decisions_{timestamp}.json"
+            # Get absolute path to project root
+            import os
+            current_file = os.path.abspath(__file__)
+            validators_dir = os.path.dirname(current_file)
+            backend_dir = os.path.dirname(validators_dir)
+            project_root = os.path.dirname(backend_dir)
+            output_file = os.path.join(project_root, 'backend', 'outputs', f'dormant_id_decisions_{timestamp}.json')
         
         # Initialize decision categories
         decisions = {

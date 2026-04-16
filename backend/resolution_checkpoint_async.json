@@ -1,20 +1,20 @@
 {
   "processed_count": 3,
-  "timestamp": "2026-04-16T11:28:43.692865",
+  "timestamp": "2026-04-16T12:25:14.559071",
   "results": {
     "060001766S": {
       "email": "jeffery.almoney@gm.com",
       "lastLogin": "2024-07-06T11:27:19Z",
       "active": true
     },
-    "0600017MEM": {
-      "email": "t.mansoor@csuohio.edu",
-      "lastLogin": "2022-04-01T13:50:57Z",
-      "active": true
-    },
     "100000HVXG": {
       "email": "Rothbauer",
       "lastLogin": "2022-04-01T15:12:55Z",
+      "active": true
+    },
+    "0600017MEM": {
+      "email": "t.mansoor@csuohio.edu",
+      "lastLogin": "2022-04-01T13:50:57Z",
       "active": true
     }
   }

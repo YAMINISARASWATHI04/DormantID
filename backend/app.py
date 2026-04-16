@@ -174,10 +174,17 @@ class ExtractorWrapper:
         # Create output filename with timestamp
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         self.output_filename = f"extraction_{timestamp}.json"
-        output_path = os.path.join('backend', 'extractions', self.output_filename)
+        
+        # Get the project root directory (parent of backend/)
+        backend_dir = os.path.dirname(os.path.abspath(__file__))
+        project_root = os.path.dirname(backend_dir)
+        
+        # Create paths relative to project root
+        extractions_dir = os.path.join(project_root, 'backend', 'extractions')
+        output_path = os.path.join(extractions_dir, self.output_filename)
         
         # Create extractions directory if it doesn't exist
-        os.makedirs(os.path.join('backend', 'extractions'), exist_ok=True)
+        os.makedirs(extractions_dir, exist_ok=True)
         
         # Initialize output file
         self.output_file = output_path
@@ -598,7 +605,10 @@ class ExtractorWrapper:
             from ibm_users_resolution_async import IBMUsersResolverAsync
 
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            output_dir = os.path.join('backend', 'backend', 'outputs')
+            # Use absolute path
+            backend_dir = os.path.dirname(os.path.abspath(__file__))
+            project_root = os.path.dirname(backend_dir)
+            output_dir = os.path.join(project_root, 'backend', 'outputs')
             resolved_file = os.path.join(output_dir, f'resolved_users_{timestamp}.json')
             failed_file = os.path.join(output_dir, f'failed_ids_{timestamp}.json')
 
@@ -653,7 +663,10 @@ class ExtractorWrapper:
             from bluepages_validator_async import validate_users_async
 
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            output_dir = os.path.join('backend', 'resolutions')
+            # Use absolute path
+            backend_dir = os.path.dirname(os.path.abspath(__file__))
+            project_root = os.path.dirname(backend_dir)
+            output_dir = os.path.join(project_root, 'backend', 'resolutions')
             to_delete_file = os.path.join(output_dir, f'to_be_deleted_{timestamp}.json')
             not_to_delete_file = os.path.join(output_dir, f'not_to_delete_{timestamp}.json')
 
@@ -698,7 +711,10 @@ class ExtractorWrapper:
             logger.info(f"Starting validation pipeline with checks: {list(checks.keys())}")
             
             # Run the validation pipeline
-            output_dir = os.path.join('backend', 'backend', 'outputs')
+            # Get the project root directory (parent of backend/)
+            backend_dir = os.path.dirname(os.path.abspath(__file__))
+            project_root = os.path.dirname(backend_dir)
+            output_dir = os.path.join(project_root, 'backend', 'outputs')
             
             # Create status update callback
             def update_validation_status(step, step_status):
@@ -1113,14 +1129,16 @@ def _get_extraction_file_path(filename):
     if not filename.endswith('.json'):
         return None, 'Invalid file type'
     
-    # Get absolute path to backend directory
+    # Get absolute path to backend directory and project root
     backend_dir = os.path.dirname(os.path.abspath(__file__))
+    project_root = os.path.dirname(backend_dir)
     
     # Check only the correct directories (using absolute paths)
     directories = [
-        os.path.join(backend_dir, 'backend', 'backend', 'outputs'),  # Decision and output files (nested path)
-        os.path.join(backend_dir, 'backend', 'outputs'),  # Decision and output files (alternative path)
-        os.path.join(backend_dir, 'backend', 'extractions'),  # Extraction files
+        os.path.join(project_root, 'backend', 'outputs'),  # Decision and output files (correct path)
+        os.path.join(project_root, 'backend', 'extractions'),  # Extraction files
+        os.path.join(backend_dir, 'backend', 'outputs'),  # Legacy nested path (for old files)
+        os.path.join(backend_dir, 'backend', 'extractions'),  # Legacy nested extraction files
     ]
     
     for directory in directories:
@@ -1192,7 +1210,10 @@ def list_extractions():
     """List all available extraction files"""
     try:
         extractions = []
-        extraction_dir = os.path.join('backend', 'extractions')
+        # Use absolute path
+        backend_dir = os.path.dirname(os.path.abspath(__file__))
+        project_root = os.path.dirname(backend_dir)
+        extraction_dir = os.path.join(project_root, 'backend', 'extractions')
         
         if os.path.exists(extraction_dir):
             for filename in os.listdir(extraction_dir):
@@ -1260,9 +1281,9 @@ def delete_history_entry(history_id):
     Delete a history entry and all its associated files.
     
     Deletes files from:
-    - backend/backend/extractions/ (extraction file)
-    - backend/backend/resolutions/ (all files with matching timestamp)
-    - backend/backend/outputs/ (all files with matching timestamp)
+    - backend/extractions/ (extraction file)
+    - backend/resolutions/ (all files with matching timestamp)
+    - backend/outputs/ (all files with matching timestamp)
     """
     try:
         # Load history
@@ -1311,15 +1332,20 @@ def delete_history_entry(history_id):
         logger.info(f"Entry: {entry}")
         logger.info(f"Current working directory: {os.getcwd()}")
         
-        # Get absolute path to backend directory
+        # Get absolute path to backend directory and project root
         backend_dir = os.path.dirname(os.path.abspath(__file__))
+        project_root = os.path.dirname(backend_dir)
         print(f"Backend directory: {backend_dir}")
+        print(f"Project root: {project_root}")
         logger.info(f"Backend directory: {backend_dir}")
+        logger.info(f"Project root: {project_root}")
         
         # Define all directories to check (using absolute paths)
         directories_to_check = [
-            (os.path.join(backend_dir, 'backend', 'extractions'), 'extractions'),
-            (os.path.join(backend_dir, 'backend', 'outputs'), 'outputs')
+            (os.path.join(project_root, 'backend', 'extractions'), 'extractions'),
+            (os.path.join(project_root, 'backend', 'outputs'), 'outputs'),
+            (os.path.join(backend_dir, 'backend', 'extractions'), 'extractions (legacy)'),
+            (os.path.join(backend_dir, 'backend', 'outputs'), 'outputs (legacy)')
         ]
         
         # Delete files from all directories
@@ -1398,15 +1424,19 @@ def clear_all_history():
         files_deleted_count = 0
         files_failed_count = 0
         
-        # Get absolute path to backend directory
+        # Get absolute path to backend directory and project root
         backend_dir = os.path.dirname(os.path.abspath(__file__))
+        project_root = os.path.dirname(backend_dir)
         directories = [
-            os.path.join(backend_dir, 'backend', 'extractions'),
-            os.path.join(backend_dir, 'backend', 'outputs')
+            os.path.join(project_root, 'backend', 'extractions'),
+            os.path.join(project_root, 'backend', 'outputs'),
+            os.path.join(backend_dir, 'backend', 'extractions'),  # Legacy path
+            os.path.join(backend_dir, 'backend', 'outputs')  # Legacy path
         ]
         
         print(f"=== CLEAR ALL OPERATION START ===")
         print(f"Backend directory: {backend_dir}")
+        print(f"Project root: {project_root}")
         print(f"Directories to clear: {directories}")
         print(f"History entries to clear: {len(history)}")
         logger.info(f"=== CLEAR ALL OPERATION START ===")
@@ -1667,7 +1697,7 @@ async def validate_isv_endpoint():
     
     Request body:
     {
-        "input_file": "backend/backend/extractions/extraction_*.json",
+        "input_file": "backend/extractions/extraction_*.json",
         "output_dir": "backend/resolutions",
         "batch_size": 100,
         "max_concurrent": 50
@@ -1826,7 +1856,7 @@ async def validate_pipeline_endpoint():
     
     Request body:
     {
-        "input_file": "backend/backend/extractions/extraction_*.json",
+        "input_file": "backend/extractions/extraction_*.json",
         "output_dir": "backend/resolutions",
         "checks": {
             "isv_validation": true,
