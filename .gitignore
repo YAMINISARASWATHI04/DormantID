@@ -43,19 +43,20 @@ Thumbs.db
 dormant_accounts*.json
 output/
 
-# Extracted data files
-backend/backend/outputs
-backend/extractions/
-backend/backend/extractions/
+# Backend generated files and directories
 backend/outputs/
-
-# Resolution output files
+backend/extractions/
 backend/resolutions/
-backend/backend/resolutions/
+backend/status.json
+backend/extraction_history.json
+backend/resolution_checkpoint_async.json
+backend/cloudant_extraction.log
+backend/ibm_users_resolution_async.log
 
-# Status files
-status.json
-extraction_history.json
+# Legacy nested directories (should not exist anymore)
+backend/backend/
+
+# Results directory
 results/
 
 # Virtual environments
