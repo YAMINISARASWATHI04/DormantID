@@ -471,11 +471,12 @@ class ExtractorWrapper:
                     'error': None,
                     'timestamp': datetime.now().isoformat(),
                     'duration_seconds': total_duration,
-                    'filename': output_file,
+                    'filename': self.output_filename,  # extraction file
+                    'output_file': output_file,  # decision file
                     'filters': self.filter_config,
                     'extraction_mode': self.extraction_mode
                 })
-                logger.info(f"Status update and history entry complete! Output file: {output_file}")
+                logger.info(f"Status update and history entry complete! Extraction: {self.output_filename}, Decision: {output_file}")
             
             if self.extractor:
                 await self.extractor.close()
@@ -1309,26 +1310,26 @@ def delete_history_entry(history_id):
         
         # Extract timestamp from filename (format: extraction_YYYYMMDD_HHMMSS.json -> YYYYMMDD_HHMMSS)
         extraction_filename = entry.get('filename', '')
+        output_filename = entry.get('output_file', '')
+        
         if extraction_filename:
             # e.g. extraction_20260407_162814.json -> 20260407_162814
             full_timestamp = extraction_filename.replace('extraction_', '').replace('.json', '')
         else:
             full_timestamp = history_id  # fallback to history_id
         
-        # Use a partial timestamp match (YYYYMMDD_HHMM) to catch files created within the same minute
-        # This handles cases where validation pipeline creates files a few seconds after extraction
-        timestamp_prefix = full_timestamp[:13] if len(full_timestamp) >= 13 else full_timestamp  # YYYYMMDD_HHMM
-        
         print(f"=== DELETE OPERATION START ===")
         print(f"History ID: {history_id}")
         print(f"Full timestamp: {full_timestamp}")
-        print(f"Timestamp prefix for matching: {timestamp_prefix}")
+        print(f"Extraction filename: {extraction_filename}")
+        print(f"Output filename: {output_filename}")
         print(f"Entry: {entry}")
         print(f"Current working directory: {os.getcwd()}")
         logger.info(f"=== DELETE OPERATION START ===")
         logger.info(f"History ID: {history_id}")
         logger.info(f"Full timestamp: {full_timestamp}")
-        logger.info(f"Timestamp prefix for matching: {timestamp_prefix}")
+        logger.info(f"Extraction filename: {extraction_filename}")
+        logger.info(f"Output filename: {output_filename}")
         logger.info(f"Entry: {entry}")
         logger.info(f"Current working directory: {os.getcwd()}")
         
@@ -1341,45 +1342,58 @@ def delete_history_entry(history_id):
         logger.info(f"Project root: {project_root}")
         
         # Define all directories to check (using absolute paths)
-        directories_to_check = [
-            (os.path.join(project_root, 'backend', 'extractions'), 'extractions'),
-            (os.path.join(project_root, 'backend', 'outputs'), 'outputs'),
-            (os.path.join(backend_dir, 'backend', 'extractions'), 'extractions (legacy)'),
-            (os.path.join(backend_dir, 'backend', 'outputs'), 'outputs (legacy)')
-        ]
+        directories_map = {
+            'extractions': [
+                os.path.join(project_root, 'backend', 'extractions'),
+                os.path.join(backend_dir, 'backend', 'extractions')
+            ],
+            'outputs': [
+                os.path.join(project_root, 'backend', 'outputs'),
+                os.path.join(backend_dir, 'backend', 'outputs')
+            ]
+        }
         
-        # Delete files from all directories
-        for dir_path, dir_name in directories_to_check:
-            if os.path.exists(dir_path):
-                print(f"Checking {dir_name} directory: {dir_path}")
-                logger.info(f"Checking {dir_name} directory: {dir_path}")
-                try:
-                    files_in_dir = os.listdir(dir_path)
-                    print(f"Files in {dir_name}: {files_in_dir}")
-                    for filename in files_in_dir:
-                        # Match files containing the timestamp prefix (matches files within same minute)
-                        if timestamp_prefix in filename:
-                            file_path = os.path.join(dir_path, filename)
-                            print(f"Found matching file in {dir_name}: {filename}")
-                            logger.info(f"Found matching file in {dir_name}: {filename}")
-                            try:
-                                if os.path.isfile(file_path):
-                                    print(f"Attempting to delete: {file_path}")
-                                    os.remove(file_path)
-                                    deleted_files.append(file_path)
-                                    print(f"✓ Deleted: {file_path}")
-                                    logger.info(f"✓ Deleted: {file_path}")
-                            except Exception as e:
-                                print(f"✗ Failed to delete {file_path}: {e}")
-                                logger.error(f"✗ Failed to delete {file_path}: {e}")
-                                failed_files.append({'file': file_path, 'error': str(e)})
-                except Exception as e:
-                    print(f"Error scanning {dir_name} directory: {e}")
-                    logger.error(f"Error scanning {dir_name} directory: {e}")
-                    failed_files.append({'directory': dir_path, 'error': str(e)})
-            else:
-                print(f"{dir_name} directory does not exist: {dir_path}")
-                logger.warning(f"{dir_name} directory does not exist: {dir_path}")
+        # Delete files matching the timestamp prefix from each directory
+        for dir_type, dir_paths in directories_map.items():
+            for dir_path in dir_paths:
+                if os.path.exists(dir_path):
+                    print(f"Checking {dir_type} directory: {dir_path}")
+                    logger.info(f"Checking {dir_type} directory: {dir_path}")
+                    try:
+                        files_in_dir = os.listdir(dir_path)
+                        for filename in files_in_dir:
+                            # Match files for this specific extraction using exact filenames
+                            should_delete = False
+                            
+                            if dir_type == 'extractions' and extraction_filename and filename == extraction_filename:
+                                should_delete = True
+                                print(f"Matched extraction file: {filename}")
+                            elif dir_type == 'outputs' and output_filename and filename == output_filename:
+                                should_delete = True
+                                print(f"Matched output file: {filename}")
+                            
+                            if should_delete:
+                                file_path = os.path.join(dir_path, filename)
+                                print(f"Found file to delete: {file_path}")
+                                logger.info(f"Found file to delete: {file_path}")
+                                try:
+                                    if os.path.isfile(file_path):
+                                        print(f"Attempting to delete: {file_path}")
+                                        os.remove(file_path)
+                                        deleted_files.append(file_path)
+                                        print(f"✓ Deleted: {file_path}")
+                                        logger.info(f"✓ Deleted: {file_path}")
+                                except Exception as e:
+                                    print(f"✗ Failed to delete {file_path}: {e}")
+                                    logger.error(f"✗ Failed to delete {file_path}: {e}")
+                                    failed_files.append({'file': file_path, 'error': str(e)})
+                    except Exception as e:
+                        print(f"Error scanning {dir_type} directory: {e}")
+                        logger.error(f"Error scanning {dir_type} directory: {e}")
+                        failed_files.append({'directory': dir_path, 'error': str(e)})
+                else:
+                    print(f"Directory does not exist: {dir_path}")
+                    logger.warning(f"Directory does not exist: {dir_path}")
         
         print(f"=== DELETE OPERATION COMPLETE ===")
         print(f"Total files deleted: {len(deleted_files)}")
