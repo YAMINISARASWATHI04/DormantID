@@ -574,15 +574,16 @@
 
 .history-item {
   padding: $spacing-05;
-  background-color: $layer-01;
-  border-radius: 8px;
-  border: 1px solid $border-subtle-01;
+  background-color: #F4F4F4;
+  border-radius: 6px;
+  border-left: 4px solid #0F62FE;
   transition: all 0.2s ease;
   margin-bottom: $spacing-04;
+  position: relative;
   
   &:hover {
-    background-color: $layer-hover-01;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    border-left-color: #0043CE;
   }
   
   &:last-child {
@@ -593,23 +594,28 @@
 .history-item-header {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: $spacing-03;
+  align-items: center;
+  margin-bottom: $spacing-04;
   gap: $spacing-03;
+  flex-wrap: wrap;
 }
 
 .history-item-details {
   display: flex;
   flex-direction: column;
-  gap: $spacing-02;
+  gap: $spacing-03;
 }
 
 .history-detail {
-  display: grid;
-  grid-template-columns: 120px 1fr;
+  display: flex;
+  justify-content: space-between;
   gap: $spacing-03;
-  align-items: center;
   font-size: 0.875rem;
+  padding: $spacing-02 0;
+  
+  &:not(:last-child) {
+    border-bottom: 1px solid #E0E0E0;
+  }
   
   &.error {
     color: $text-error;
@@ -617,18 +623,20 @@
 }
 
 .history-label {
-  font-weight: 600;
-  color: $text-secondary;
+  font-weight: 500;
+  color: #525252;
   font-size: 0.875rem;
 }
 
 .history-value {
-  color: $text-primary;
+  color: #161616;
   font-size: 0.875rem;
   word-break: break-word;
+  text-align: right;
+  font-weight: 600;
   
   &.history-filters {
-    color: $text-primary;
+    color: #161616;
     font-weight: 500;
     line-height: 1.5;
   }
@@ -636,7 +644,7 @@
   &.history-filename {
     font-family: 'IBM Plex Mono', monospace;
     font-size: 0.75rem;
-    color: $link-primary;
+    color: #0F62FE;
     word-break: break-all;
   }
 }
@@ -644,23 +652,23 @@
 .history-job-id {
   font-weight: 700;
   font-size: 1rem;
-  color: $text-primary;
+  color: #161616;
   margin-bottom: $spacing-02;
 }
 
 .history-timestamp {
-  color: $text-secondary;
+  color: #525252;
   font-size: 0.75rem;
-  margin-bottom: $spacing-03;
+  margin-left: auto;
 }
 
 .history-item-actions {
   display: flex;
-  gap: $spacing-02;
+  gap: $spacing-03;
   justify-content: flex-end;
-  margin-top: $spacing-03;
-  padding-top: $spacing-03;
-  border-top: 1px solid $border-subtle-01;
+  margin-top: $spacing-04;
+  padding-top: $spacing-04;
+  border-top: 1px solid #E0E0E0;
   
   .cds--btn {
     min-height: 2rem;

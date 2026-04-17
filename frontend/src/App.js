@@ -936,11 +936,19 @@ function App() {
               <div className="history-list">
                 {history.map((entry, index) => (
                   <div key={entry.id} className="history-item">
-                    <div className="history-job-id">EX{String(history.length - index).padStart(3, '0')}</div>
-                    <div className="history-timestamp">
-                      {new Date(entry.timestamp).toLocaleString()}
+                    <div className="history-item-header">
+                      <Tag type="green" size="sm">
+                        Completed
+                      </Tag>
+                      <div className="history-timestamp">
+                        {new Date(entry.timestamp).toLocaleString()}
+                      </div>
                     </div>
                     <div className="history-item-details">
+                      <div className="history-detail">
+                        <span className="history-label">Job ID</span>
+                        <span className="history-value">EX{String(history.length - index).padStart(3, '0')}</span>
+                      </div>
                       <div className="history-detail">
                         <span className="history-label">Extraction Mode</span>
                         <span className="history-value">
