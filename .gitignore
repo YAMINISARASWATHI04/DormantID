@@ -47,6 +47,7 @@ output/
 backend/backend/outputs
 backend/extractions/
 backend/backend/extractions/
+backend/outputs/
 
 # Resolution output files
 backend/resolutions/
