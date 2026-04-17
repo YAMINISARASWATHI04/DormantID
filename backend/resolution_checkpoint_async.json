@@ -1,10 +1,20 @@
 {
-  "processed_count": 1,
-  "timestamp": "2026-04-17T13:10:50.259403",
+  "processed_count": 6,
+  "timestamp": "2026-04-17T16:54:44.782922",
   "results": {
-    "0600017MEM": {
-      "email": "t.mansoor@csuohio.edu",
-      "lastLogin": "2022-04-01T13:50:57Z",
+    "550006MQ3A": {
+      "email": "ssmprov+237test@mail.test.us.ibm.com",
+      "lastLogin": "2021-08-16T14:16:04Z",
+      "active": true
+    },
+    "03000001KY": {
+      "email": "123",
+      "lastLogin": null,
+      "active": false
+    },
+    "0600029UQA": {
+      "email": "ooshima@pluto.dti.ne.jp",
+      "lastLogin": "2025-01-01T11:00:18Z",
       "active": true
     }
   }

@@ -1006,21 +1006,21 @@ function App() {
                         size="sm"
                         renderIcon={View}
                         onClick={() => {
-                          if (entry.filename) {
-                            window.open(`/view?file=${encodeURIComponent(entry.filename)}`, '_blank');
+                          if (entry.output_file) {
+                            window.open(`/view?file=${encodeURIComponent(entry.output_file)}`, '_blank');
                           }
                         }}
                         iconDescription="View"
-                        disabled={!entry.filename}
+                        disabled={!entry.output_file}
                         hasIconOnly
                       />
                       <Button
                         kind="ghost"
                         size="sm"
                         renderIcon={Download}
-                        onClick={() => entry.filename && handleDownload(entry.filename)}
+                        onClick={() => entry.output_file && handleDownload(entry.output_file)}
                         iconDescription="Download"
-                        disabled={!entry.filename}
+                        disabled={!entry.output_file}
                         hasIconOnly
                       />
                       <Button
