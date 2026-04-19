@@ -115,7 +115,30 @@ def consolidate_decisions(
         if "bluepages" in pipeline_results.get("results", {}):
             bluepages_result = pipeline_results["results"]["bluepages"]
             
-            # Users not found in BluPages → to_be_deleted
+            # Process non-IBM users first (skipped BluPages validation)
+            non_ibm_info = bluepages_result.get("non_ibm_users", {})
+            non_ibm_file = non_ibm_info.get("file")
+            
+            if non_ibm_file and Path(non_ibm_file).exists():
+                with open(non_ibm_file, 'r') as f:
+                    non_ibm_users = json.load(f)
+                
+                for user in non_ibm_users:
+                    user_id = user.get("user_id", user.get("id", ""))
+                    if user_id not in processed_ids:
+                        decisions["to_be_deleted"].append({
+                            "id": user_id,
+                            "username": user.get("username", user.get("email", user_id)),
+                            "lastLogin": user.get("lastLogin"),
+                            "activeStatus": user.get("active", True),
+                            "reasons": [
+                                "User has old login (>1065 days)",
+                                "FINAL DECISION: No BluPages Check (Non-IBM Email Domain)"
+                            ]
+                        })
+                        processed_ids.add(user_id)
+            
+            # Users not found in BluPages (IBM emails only) → to_be_deleted
             to_delete_file = bluepages_result.get("files_created", {}).get("to_delete")
             if to_delete_file and Path(to_delete_file).exists():
                 with open(to_delete_file, 'r') as f:

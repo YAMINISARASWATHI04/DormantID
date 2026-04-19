@@ -234,28 +234,27 @@ async def run_validation_pipeline(
             
             print(f"  IBM emails: {len(ibm_users)}, Non-IBM emails: {len(non_ibm_users)}")
             
-            # Add non-IBM users directly to to_be_deleted (per flowchart: remaining mails go to "To be deleted")
+            # Get absolute path to project root
+            import os
+            current_file_path = os.path.abspath(__file__)
+            validators_dir = os.path.dirname(current_file_path)
+            backend_dir = os.path.dirname(validators_dir)
+            project_root = os.path.dirname(backend_dir)
+            outputs_dir = Path(project_root) / "backend" / "outputs"
+            outputs_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Store non-IBM users separately with a marker for decision engine
+            non_ibm_file = None
             if non_ibm_users:
-                # Use the same outputs directory structure
-                # Get absolute path to project root
-                import os
-                current_file = os.path.abspath(__file__)
-                validators_dir = os.path.dirname(current_file)
-                backend_dir = os.path.dirname(validators_dir)
-                project_root = os.path.dirname(backend_dir)
-                outputs_dir = Path(project_root) / "backend" / "outputs"
-                outputs_dir.mkdir(parents=True, exist_ok=True)
-                to_delete_file = outputs_dir / f"to_be_deleted_{timestamp}.json"
+                non_ibm_file = outputs_dir / f"non_ibm_emails_{timestamp}.json"
                 
-                if to_delete_file.exists():
-                    with open(to_delete_file, 'r') as f:
-                        existing = json.load(f)
-                    existing.extend(non_ibm_users)
-                    with open(to_delete_file, 'w') as f:
-                        json.dump(existing, f, indent=2)
-                else:
-                    with open(to_delete_file, 'w') as f:
-                        json.dump(non_ibm_users, f, indent=2)
+                # Mark these users as skipping BluPages check
+                for user in non_ibm_users:
+                    user['skip_bluepages'] = True
+                    user['skip_reason'] = 'Non-IBM Email Domain'
+                
+                with open(non_ibm_file, 'w') as f:
+                    json.dump(non_ibm_users, f, indent=2)
             
             # Run BluPages validation only on IBM users - pass data directly
             if ibm_users:
@@ -267,28 +266,33 @@ async def run_validation_pipeline(
                     batch_size=batch_size
                 )
                 results["bluepages"] = result
+                
+                # Add non-IBM users info to results for decision engine
+                if non_ibm_users:
+                    results["bluepages"]["non_ibm_users"] = {
+                        "count": len(non_ibm_users),
+                        "file": str(non_ibm_file)
+                    }
+                
                 checks_run.append("bluepages")
                 
                 summary["found_in_bluepages"] = result["output"]["found_in_bluepages"]
                 summary["not_found_in_bluepages"] = result["output"]["not_found_in_bluepages"]
+                summary["non_ibm_emails"] = len(non_ibm_users)
                 # Non-IBM users + users not found in BluPages = to_delete
                 summary["to_delete"] = result["output"]["not_found_in_bluepages"] + len(non_ibm_users)
                 # Users found in BluPages + recent login users = not_to_delete
                 summary["not_to_delete"] = result["output"]["found_in_bluepages"] + summary.get("recent_login", 0)
                 
                 print(f"✓ BluPages Validation complete: {result['output']['found_in_bluepages']} found, {result['output']['not_found_in_bluepages']} not found")
-                print(f"  Non-IBM emails marked for deletion: {len(non_ibm_users)}")
+                print(f"  Non-IBM emails (skipped BluPages): {len(non_ibm_users)}")
                 if status_callback:
                     status_callback("BluPages Validation", "completed")
             else:
                 print(f"✓ No IBM users to validate via BluPages")
                 if status_callback:
                     status_callback("BluPages Validation", "completed")
-                # All non-IBM users go to to_delete
-                summary["to_delete"] = len(non_ibm_users)
-                summary["not_to_delete"] = summary.get("recent_login", 0)
                 
-                # Non-IBM users already added to to_be_deleted file above
                 # Get absolute path to project root
                 import os
                 current_file = os.path.abspath(__file__)
@@ -313,6 +317,20 @@ async def run_validation_pipeline(
                         "not_to_delete": str(outputs_dir / "not_to_be_deleted.json")
                     }
                 }
+                
+                # Add non-IBM users info to results for decision engine
+                if non_ibm_users:
+                    results["bluepages"]["non_ibm_users"] = {
+                        "count": len(non_ibm_users),
+                        "file": str(non_ibm_file)
+                    }
+                    summary["non_ibm_emails"] = len(non_ibm_users)
+                    summary["to_delete"] = len(non_ibm_users)
+                else:
+                    summary["to_delete"] = 0
+                
+                summary["not_to_delete"] = summary.get("recent_login", 0)
+                
                 checks_run.append("bluepages")
             
             print()

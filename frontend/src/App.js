@@ -628,7 +628,7 @@ function App() {
                     id="specific-ids"
                     labelText="User IDs"
                     helperText="Enter user IDs separated by commas, spaces, or new lines"
-                    placeholder="user1@example.com, user2@example.com&#10;user3@example.com"
+                    placeholder="abc123def4, xyz789ghi5&#10;mno456pqr7"
                     value={specificIds}
                     onChange={(e) => setSpecificIds(e.target.value)}
                     disabled={isDisabled}
