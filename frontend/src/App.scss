@@ -305,13 +305,23 @@
   }
 }
 
-// Extraction Settings Section
-.extraction-settings-batch {
+// Extraction Settings Section - Horizontal Row Layout with Reduced Width
+.extraction-settings-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: $spacing-06;
   margin-bottom: $spacing-06;
-  max-width: 400px;
+  align-items: start;
 
-  .cds--number-input {
-    width: 100%;
+  @include breakpoint-down(md) {
+    grid-template-columns: 1fr;
+    gap: $spacing-05;
+  }
+
+  // Limit width of input containers
+  .cds--number-input,
+  .threshold-input-wrapper {
+    max-width: 320px; // Reduced from full width
   }
 
   .cds--label {
@@ -359,6 +369,77 @@
     color: $text-secondary;
     font-size: 0.75rem;
     margin-top: $spacing-02;
+  }
+}
+
+// Threshold Input Wrapper - Clean Flexbox Layout
+.threshold-input-wrapper {
+  max-width: 100%;
+
+  .threshold-input-group {
+    display: flex;
+    gap: $spacing-03; // Use gap for spacing, not margins
+    align-items: flex-end; // Align both at bottom baseline
+    flex-wrap: nowrap; // Keep on same line
+    max-width: 400px; // Reasonable max width for the group
+
+    // NumberInput takes remaining space
+    .cds--number-input {
+      flex: 1 1 auto;
+      min-width: 150px;
+      max-width: 250px;
+    }
+
+    // Dropdown has fixed width
+    .threshold-unit-select-wrapper {
+      flex: 0 0 120px;
+      
+      // Remove ALL default margins and padding from Carbon components
+      .cds--form-item,
+      .threshold-unit-select-inline,
+      .cds--select {
+        margin: 0 !important;
+        padding: 0;
+      }
+      
+      // Completely hide the label (no space)
+      .cds--label {
+        display: none !important;
+        height: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+
+      // Ensure select wrapper doesn't add spacing
+      .cds--select-input__wrapper {
+        margin: 0 !important;
+      }
+
+      // Style the select input to match NumberInput
+      .cds--select-input {
+        background-color: #FFFFFF;
+        border: 1px solid #E0E0E0;
+        border-radius: 4px;
+        height: 2.5rem; // Match NumberInput height (40px)
+        line-height: 2.5rem;
+        width: 100%;
+        margin: 0 !important;
+
+        &:hover {
+          background-color: #FFFFFF;
+        }
+
+        &:focus {
+          outline: 2px solid #0F62FE;
+          outline-offset: -2px;
+        }
+
+        &:disabled {
+          background-color: #F4F4F4;
+          color: $text-disabled;
+        }
+      }
+    }
   }
 }
 

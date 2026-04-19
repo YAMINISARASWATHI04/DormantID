@@ -161,7 +161,7 @@ class HistoryManager:
 class ExtractorWrapper:
     """Wrapper for CloudantExtractor with status tracking"""
     
-    def __init__(self, start_date, end_date, filter_config=None, batch_size=3000, user_ids=None, extraction_mode='date_range'):
+    def __init__(self, start_date, end_date, filter_config=None, batch_size=3000, user_ids=None, extraction_mode='date_range', threshold_days=1095):
         self.start_date = start_date
         self.end_date = end_date
         self.extractor = None
@@ -171,6 +171,7 @@ class ExtractorWrapper:
         self.stop_requested = False
         self.user_ids = user_ids or []
         self.extraction_mode = extraction_mode
+        self.threshold_days = threshold_days  # Configurable threshold for last login check
         
     def calculate_total_months(self):
         """Calculate total months in date range"""
@@ -791,7 +792,7 @@ class ExtractorWrapper:
                 output_dir=output_dir,
                 checks=checks,
                 status_callback=update_validation_status,
-                days_threshold=1095,  # 3 years
+                days_threshold=self.threshold_days,  # Configurable threshold from UI
                 max_concurrent=int(os.getenv('MAX_CONCURRENT', '50')),
                 batch_size=int(os.getenv('RESOLUTION_BATCH_SIZE', '100'))
             )
@@ -951,6 +952,10 @@ def start_retrieval():
         filters = data.get('filters', {})  # Get filter configuration
         batch_size = data.get('batch_size', 3000)  # Get batch size, default 3000
         
+        # Get threshold parameters
+        threshold_value = data.get('threshold_value', 3)
+        threshold_unit = data.get('threshold_unit', 'years')
+        
         # Validate batch size
         try:
             batch_size = int(batch_size)
@@ -964,6 +969,30 @@ def start_retrieval():
                 'success': False,
                 'error': 'Invalid batch size'
             }), 400
+        
+        # Validate and convert threshold
+        try:
+            threshold_value = float(threshold_value)
+            if threshold_value <= 0:
+                return jsonify({
+                    'success': False,
+                    'error': 'Threshold value must be greater than 0'
+                }), 400
+        except (ValueError, TypeError):
+            return jsonify({
+                'success': False,
+                'error': 'Invalid threshold value'
+            }), 400
+        
+        # Validate threshold unit
+        if threshold_unit not in ['days', 'years']:
+            return jsonify({
+                'success': False,
+                'error': 'Threshold unit must be either "days" or "years"'
+            }), 400
+        
+        # Convert to days if unit is years
+        threshold_days = int(threshold_value * 365) if threshold_unit == 'years' else int(threshold_value)
         
         # Handle different extraction modes
         if extraction_mode == 'date_range':
@@ -1002,7 +1031,13 @@ def start_retrieval():
                 }), 400
             
             # Create extractor wrapper with filter configuration and batch size
-            wrapper = ExtractorWrapper(start_date, end_date, filter_config=filters, batch_size=batch_size)
+            wrapper = ExtractorWrapper(
+                start_date,
+                end_date,
+                filter_config=filters,
+                batch_size=batch_size,
+                threshold_days=threshold_days
+            )
             
             # Store reference to wrapper for stop functionality
             with current_extractor_lock:
@@ -1017,7 +1052,8 @@ def start_retrieval():
                 'message': 'Data retrieval started successfully',
                 'extraction_mode': 'date_range',
                 'start_date': start_date,
-                'end_date': end_date
+                'end_date': end_date,
+                'threshold': f'{threshold_value} {threshold_unit} ({threshold_days} days)'
             })
             
         elif extraction_mode == 'specific_ids':
@@ -1037,7 +1073,8 @@ def start_retrieval():
                 filter_config=filters,
                 batch_size=batch_size,
                 user_ids=user_ids,
-                extraction_mode='specific_ids'
+                extraction_mode='specific_ids',
+                threshold_days=threshold_days
             )
             
             # Store reference to wrapper for stop functionality

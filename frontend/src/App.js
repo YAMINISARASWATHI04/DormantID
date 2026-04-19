@@ -16,7 +16,9 @@ import {
   RadioButtonGroup,
   RadioButton,
   TextArea,
-  Tooltip
+  Tooltip,
+  Select,
+  SelectItem
 } from '@carbon/react';
 import { Renew, Download, StopFilled, TrashCan, View, Calendar, Time, Information } from '@carbon/icons-react';
 import axios from 'axios';
@@ -32,6 +34,8 @@ function App() {
   const [endTime, setEndTime] = useState('23:59');
   const [specificIds, setSpecificIds] = useState('');
   const [batchSize, setBatchSize] = useState(3000);
+  const [thresholdValue, setThresholdValue] = useState(3);
+  const [thresholdUnit, setThresholdUnit] = useState('years');
   const [status, setStatus] = useState(null);
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -366,7 +370,9 @@ function App() {
       const requestData = {
         extraction_mode: extractionMode,
         batch_size: batchSize,
-        filters: selectedFilters
+        filters: selectedFilters,
+        threshold_value: thresholdValue,
+        threshold_unit: thresholdUnit
       };
 
       if (extractionMode === 'date_range') {
@@ -442,6 +448,8 @@ function App() {
         setEndTime('23:59');
         setSpecificIds('');
         setBatchSize(3000);
+        setThresholdValue(3);
+        setThresholdUnit('years');
         
         // Reset to default filters (ISV Validation, Dormancy Check, Federated ID removal)
         const defaultFilters = {};
@@ -639,7 +647,7 @@ function App() {
         </AccordionItem>
 
         <AccordionItem title="Extraction Settings" open>
-          <div className="extraction-settings-batch">
+          <div className="extraction-settings-row">
             <NumberInput
               id="batch-size"
               label="Batch Size"
@@ -652,6 +660,37 @@ function App() {
               disabled={isDisabled}
               invalidText="Batch size must be between 100 and 10000"
             />
+
+            <div className="threshold-input-wrapper">
+              <div className="threshold-input-group">
+                <NumberInput
+                  id="threshold-value"
+                  label="Last Login Limit"
+                  helperText={`${thresholdValue} ${thresholdUnit}${thresholdUnit === 'years' ? ` (${thresholdValue * 365} days)` : ''}`}
+                  min={1}
+                  max={10000}
+                  step={1}
+                  value={thresholdValue}
+                  onChange={(e, { value }) => setThresholdValue(value)}
+                  disabled={isDisabled}
+                  invalidText="Value must be greater than 0"
+                />
+                <div className="threshold-unit-select-wrapper">
+                  <Select
+                    id="threshold-unit"
+                    labelText=""
+                    hideLabel
+                    value={thresholdUnit}
+                    onChange={(e) => setThresholdUnit(e.target.value)}
+                    disabled={isDisabled}
+                    className="threshold-unit-select-inline"
+                  >
+                    <SelectItem value="years" text="Years" />
+                    <SelectItem value="days" text="Days" />
+                  </Select>
+                </div>
+              </div>
+            </div>
           </div>
 
           <div className="extraction-settings-filters">

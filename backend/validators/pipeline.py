@@ -375,14 +375,16 @@ async def run_validation_pipeline(
             "results": results,
             "final_outputs": final_outputs,
             "summary": summary,
-            "duration_seconds": int(duration)
+            "duration_seconds": int(duration),
+            "threshold_days": days_threshold  # Pass threshold to decision engine
         }
         
         # Run decision engine to consolidate all results into single JSON with timestamp
         print(f"Running Decision Engine to consolidate results...")
         decision_result = consolidate_decisions(
             pipeline_results=pipeline_result,
-            timestamp=timestamp
+            timestamp=timestamp,
+            threshold_days=days_threshold  # Pass threshold to decision engine
         )
         
         # Add decision engine output to pipeline result

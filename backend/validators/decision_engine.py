@@ -25,7 +25,8 @@ class DecisionEngineError(Exception):
 def consolidate_decisions(
     pipeline_results: Dict,
     output_file: Optional[str] = None,
-    timestamp: Optional[str] = None
+    timestamp: Optional[str] = None,
+    threshold_days: int = 1095
 ) -> Dict:
     """
     Consolidate all validation results into a single unified decision file.
@@ -34,6 +35,7 @@ def consolidate_decisions(
         pipeline_results: Results dictionary from run_validation_pipeline
         output_file: Path to save the unified decision JSON (auto-generated if None)
         timestamp: Timestamp string for filename (auto-generated if None)
+        threshold_days: Threshold in days for login check (default: 1095 = 3 years)
         
     Returns:
         Dictionary with consolidated decisions:
@@ -45,6 +47,10 @@ def consolidate_decisions(
         }
     """
     try:
+        # Get threshold from pipeline results or use parameter
+        threshold_days = pipeline_results.get("threshold_days", threshold_days)
+        threshold_years = round(threshold_days / 365, 1)
+        
         # Generate timestamp if not provided
         if timestamp is None:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -132,7 +138,7 @@ def consolidate_decisions(
                             "lastLogin": user.get("lastLogin"),
                             "activeStatus": user.get("active", True),
                             "reasons": [
-                                "User has old login (>1065 days)",
+                                f"User has old login (>{threshold_days} days / {threshold_years} years - user-defined)",
                                 "FINAL DECISION: No BluPages Check (Non-IBM Email Domain)"
                             ]
                         })
@@ -153,7 +159,7 @@ def consolidate_decisions(
                             "lastLogin": user.get("lastLogin"),
                             "activeStatus": user.get("active", True),
                             "reasons": [
-                                "User has old login (>1065 days)",
+                                f"User has old login (>{threshold_days} days / {threshold_years} years - user-defined)",
                                 "User not found in IBM BluPages - FINAL DECISION: BluPages Validation Failed"
                             ]
                         })
@@ -179,10 +185,10 @@ def consolidate_decisions(
                                 current_time = datetime.now(timezone.utc)
                                 days_since_login = (current_time - last_login_date).days
                                 
-                                if days_since_login <= 1065:
-                                    reasons.append(f"User has recent login (≤1065 days, actual: {days_since_login} days) - FINAL DECISION: Last Login Check Passed")
+                                if days_since_login <= threshold_days:
+                                    reasons.append(f"User has recent login (≤{threshold_days} days / {threshold_years} years - user-defined, actual: {days_since_login} days) - FINAL DECISION: Last Login Check Passed")
                                 else:
-                                    reasons.append(f"User has old login (>{days_since_login} days)")
+                                    reasons.append(f"User has old login (>{days_since_login} days, threshold: {threshold_days} days / {threshold_years} years - user-defined)")
                                     reasons.append("User found in IBM BluPages - FINAL DECISION: BluPages Validation Passed")
                             except:
                                 reasons.append("User found in IBM BluPages - FINAL DECISION: BluPages Validation Passed")
@@ -226,7 +232,7 @@ def consolidate_decisions(
                             "username": user.get("username", user.get("email", user_id)),
                             "lastLogin": last_login,
                             "activeStatus": user.get("active", True),
-                            "reasons": [f"User has recent login (≤1065 days, actual: {days_since} days) - FINAL DECISION: Last Login Check Passed"]
+                            "reasons": [f"User has recent login (≤{threshold_days} days / {threshold_years} years - user-defined, actual: {days_since} days) - FINAL DECISION: Last Login Check Passed"]
                         })
                         processed_ids.add(user_id)
         
