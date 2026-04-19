@@ -9,6 +9,10 @@ aiofiles>=23.2.1
 Flask>=3.0.0
 Flask-CORS>=4.0.0
 
+# Swagger/OpenAPI Documentation
+flasgger>=0.9.7
+flask-swagger-ui>=4.11.1
+
 # HTTP requests and API integrations
 requests>=2.31.0
 urllib3>=2.0.0

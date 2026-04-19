@@ -13,6 +13,7 @@ from flask_cors import CORS
 from dotenv import load_dotenv
 import sys
 import subprocess
+from flasgger import Swagger, swag_from
 
 # Add parent directory to path to import cloudant_extractor
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -20,6 +21,7 @@ from cloudant_extractor_async import CloudantExtractorAsync
 from backend import user_filters
 from backend import validators
 from backend.filters import FilterManager
+from backend import swagger_specs
 import asyncio
 
 # Load environment variables
@@ -27,6 +29,36 @@ load_dotenv()
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for React frontend
+
+# Configure Swagger
+swagger_config = {
+    "headers": [],
+    "specs": [
+        {
+            "endpoint": 'apispec',
+            "route": '/apispec.json',
+            "rule_filter": lambda rule: True,
+            "model_filter": lambda tag: True,
+        }
+    ],
+    "static_url_path": "/flasgger_static",
+    "swagger_ui": True,
+    "specs_route": "/api/docs"
+}
+
+swagger_template = {
+    "swagger": "2.0",
+    "info": {
+        "title": "Dormant ID Check System API",
+        "description": "REST API for IBM Cloudant data extraction and user validation system",
+        "version": "1.0.0"
+    },
+    "basePath": "/",
+    "schemes": ["http"],
+}
+
+# Initialize Swagger
+swagger = Swagger(app, config=swagger_config, template=swagger_template)
 
 # Status file path
 STATUS_FILE = 'status.json'
@@ -868,6 +900,7 @@ logger = logging.getLogger(__name__)
 
 
 @app.route('/api/status', methods=['GET'])
+@swag_from(swagger_specs.get_status_spec)
 def get_status():
     """Get current job status"""
     status = StatusManager.load_status()
@@ -876,6 +909,7 @@ def get_status():
 
 
 @app.route('/api/filters', methods=['GET'])
+@swag_from(swagger_specs.get_filters_spec)
 def get_filters():
     """Get list of available filters"""
     try:
@@ -896,6 +930,7 @@ def get_filters():
         }), 500
 
 @app.route('/api/retrieve', methods=['POST'])
+@swag_from(swagger_specs.start_retrieval_spec)
 def start_retrieval():
     """Start data retrieval job"""
     global current_extractor
@@ -1034,6 +1069,7 @@ def start_retrieval():
 
 
 @app.route('/api/reset', methods=['POST'])
+@swag_from(swagger_specs.reset_status_spec)
 def reset_status():
     """Reset job status to not_started"""
     try:
@@ -1072,6 +1108,7 @@ def reset_status():
 
 
 @app.route('/api/stop', methods=['POST'])
+@swag_from(swagger_specs.stop_extraction_spec)
 def stop_extraction():
     """Stop the currently running extraction"""
     try:
@@ -1151,6 +1188,7 @@ def _get_extraction_file_path(filename):
 
 
 @app.route('/api/download/<filename>', methods=['GET'])
+@swag_from(swagger_specs.download_file_spec)
 def download_file(filename):
     """Download extraction file"""
     try:
@@ -1178,6 +1216,7 @@ def download_file(filename):
 
 
 @app.route('/api/view/<filename>', methods=['GET'])
+@swag_from(swagger_specs.view_file_spec)
 def view_file(filename):
     """View extraction file - returns full JSON structure"""
     try:
@@ -1207,6 +1246,7 @@ def view_file(filename):
 
 
 @app.route('/api/extractions', methods=['GET'])
+@swag_from(swagger_specs.list_extractions_spec)
 def list_extractions():
     """List all available extraction files"""
     try:
@@ -1266,6 +1306,7 @@ def root():
 
 
 @app.route('/api/history', methods=['GET'])
+@swag_from(swagger_specs.get_history_spec)
 def get_history():
     """Get extraction history"""
     history = HistoryManager.load_history()
@@ -1606,6 +1647,7 @@ def filter_users_by_login():
 
 
 @app.route('/api/users/process-pipeline', methods=['POST'])
+@swag_from(swagger_specs.process_pipeline_spec)
 def process_user_pipeline():
     """
     Run complete user processing pipeline:
@@ -1705,6 +1747,7 @@ def list_user_files():
 # ============================================================================
 
 @app.route('/api/validate/isv', methods=['POST'])
+@swag_from(swagger_specs.validate_isv_spec)
 async def validate_isv_endpoint():
     """
     Validate users against ISV (IBM Users API).
@@ -1744,6 +1787,7 @@ async def validate_isv_endpoint():
 
 
 @app.route('/api/validate/active-status', methods=['POST'])
+@swag_from(swagger_specs.validate_active_status_spec)
 def validate_active_status_endpoint():
     """
     Split users by active/inactive status.
@@ -1780,6 +1824,7 @@ def validate_active_status_endpoint():
 
 
 @app.route('/api/validate/last-login', methods=['POST'])
+@swag_from(swagger_specs.validate_last_login_spec)
 def validate_last_login_endpoint():
     """
     Filter users by last login date.
@@ -1822,6 +1867,7 @@ def validate_last_login_endpoint():
 
 
 @app.route('/api/validate/bluepages', methods=['POST'])
+@swag_from(swagger_specs.validate_bluepages_spec)
 async def validate_bluepages_endpoint():
     """
     Validate users against IBM BluPages.
@@ -1864,6 +1910,7 @@ async def validate_bluepages_endpoint():
 
 
 @app.route('/api/validate/pipeline', methods=['POST'])
+@swag_from(swagger_specs.validate_pipeline_spec)
 async def validate_pipeline_endpoint():
     """
     Run complete validation pipeline with selected checks.
@@ -1916,6 +1963,7 @@ async def validate_pipeline_endpoint():
 
 
 @app.route('/api/health', methods=['GET'])
+@swag_from(swagger_specs.health_check_spec)
 def health_check():
     """Health check endpoint"""
     return jsonify({
@@ -1941,6 +1989,6 @@ if __name__ == '__main__':
         })
     
     # Run Flask app
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    app.run(debug=True, host='0.0.0.0', port=5001)
 
 # Made with Bob

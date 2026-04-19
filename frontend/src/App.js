@@ -22,7 +22,7 @@ import { Renew, Download, StopFilled, TrashCan, View, Calendar, Time, Informatio
 import axios from 'axios';
 import './App.scss';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
 
 function App() {
   const [extractionMode, setExtractionMode] = useState('date_range');
@@ -289,7 +289,8 @@ function App() {
   // Handle view data
   const handleViewData = (filename) => {
     if (filename) {
-      window.open(`/view?file=${encodeURIComponent(filename)}`, '_blank');
+      const url = `${window.location.origin}/view?file=${encodeURIComponent(filename)}`;
+      window.open(url, '_blank');
     }
   };
 
@@ -1007,7 +1008,8 @@ function App() {
                         renderIcon={View}
                         onClick={() => {
                           if (entry.output_file) {
-                            window.open(`/view?file=${encodeURIComponent(entry.output_file)}`, '_blank');
+                            const url = `${window.location.origin}/view?file=${encodeURIComponent(entry.output_file)}`;
+                            window.open(url, '_blank');
                           }
                         }}
                         iconDescription="View"

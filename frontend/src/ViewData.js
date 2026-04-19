@@ -26,7 +26,7 @@ import { Download, ArrowLeft } from '@carbon/icons-react';
 import axios from 'axios';
 import './ViewData.scss';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
 
 function ViewData() {
   const [data, setData] = useState(null);

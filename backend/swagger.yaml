@@ -1,0 +1,892 @@
+openapi: 3.0.0
+info:
+  title: Dormant ID Check System API
+  description: |
+    REST API for IBM Cloudant data extraction and user validation system.
+    
+    ## Features
+    - Extract user data from Cloudant database by date range
+    - Validate specific user IDs via ISV
+    - Apply configurable filters during validation pipeline
+    - Track job progress and status
+    - Download and view extraction results
+    
+    ## Two Extraction Modes
+    
+    ### Mode 1: Date Range Extraction
+    Extracts data from Cloudant database for a specific date range. All records within the date range are written to an extraction file, and filters are applied during the validation pipeline.
+    
+    ### Mode 2: Specific IDs Validation
+    Validates a list of specific user IDs directly via ISV without querying Cloudant. Useful for validating known user IDs.
+    
+    ## Available Filters
+    - **Dormancy Check**: Identifies accounts inactive for 3+ years
+    - **Federated ID Removal**: Filters out non-@ibm.com email addresses
+    - **ISV Validation**: Validates users against IBM ISV system
+    - **Active Status Check**: Checks user active/inactive status
+    - **Last Login Check**: Validates last login dates
+    - **BluPages Validation**: Validates users against IBM BluPages
+    
+    ## Important Notes
+    - Filters are applied during the **validation pipeline**, NOT during extraction
+    - Extraction files always contain ALL records from the date range
+    - Validation creates a separate output file with categorized results
+    
+  version: 1.0.0
+  contact:
+    name: API Support
+    email: support@example.com
+
+servers:
+  - url: http://localhost:5001
+    description: Local development server
+
+tags:
+  - name: System
+    description: System health and status endpoints
+  - name: Job Management
+    description: Manage extraction jobs
+  - name: Data Extraction
+    description: Extract and process user data
+  - name: Filters
+    description: Manage validation filters
+  - name: File Management
+    description: Download and view extraction files
+  - name: History
+    description: View extraction history
+  - name: User Processing
+    description: Process and validate users
+
+paths:
+  /api/health:
+    get:
+      tags:
+        - System
+      summary: Health check
+      description: Check if the API is running and healthy
+      operationId: healthCheck
+      responses:
+        '200':
+          description: API is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: healthy
+                  timestamp:
+                    type: string
+                    format: date-time
+                    example: '2026-04-19T10:30:00.000Z'
+
+  /api/status:
+    get:
+      tags:
+        - Job Management
+      summary: Get current job status
+      description: Retrieve the current status of the extraction job including progress, records processed, and any errors
+      operationId: getStatus
+      responses:
+        '200':
+          description: Current job status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobStatus'
+
+  /api/filters:
+    get:
+      tags:
+        - Filters
+      summary: Get available filters
+      description: Retrieve list of all available validation filters that can be applied during extraction
+      operationId: getFilters
+      responses:
+        '200':
+          description: List of available filters
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  filters:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Filter'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/retrieve:
+    post:
+      tags:
+        - Data Extraction
+      summary: Start data extraction job
+      description: |
+        Start a data extraction job with two modes:
+        
+        **Mode 1: Date Range Extraction**
+        - Extracts data from Cloudant database for a specific date range
+        - Pulls all records created/modified within the date range
+        - Applies optional filters during validation pipeline
+        
+        **Mode 2: Specific IDs Validation**
+        - Validates a list of specific user IDs directly via ISV
+        - Does not query Cloudant database
+        - Useful for validating known user IDs
+        
+        Both modes support optional filters that are applied during the validation pipeline (NOT during extraction).
+      operationId: startRetrieval
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: '#/components/schemas/DateRangeRequest'
+                - $ref: '#/components/schemas/SpecificIdsRequest'
+            examples:
+              dateRangeExample:
+                summary: Date Range Extraction
+                value:
+                  extraction_mode: date_range
+                  start_date: '2020-04-15'
+                  end_date: '2020-04-15'
+                  filters:
+                    dormancy_check: true
+                    federated_id_removal: true
+                    isv_validation: true
+                  batch_size: 3000
+              specificIdsExample:
+                summary: Specific IDs Validation
+                value:
+                  extraction_mode: specific_ids
+                  user_ids:
+                    - user1@ibm.com
+                    - user2@ibm.com
+                    - user3@ibm.com
+                  filters:
+                    isv_validation: true
+                  batch_size: 1000
+      responses:
+        '200':
+          description: Extraction job started successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExtractionStartResponse'
+        '400':
+          description: Bad request - Invalid input or job already running
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                jobRunning:
+                  summary: Job already running
+                  value:
+                    success: false
+                    error: A job is already running. Please wait for it to complete.
+                invalidBatchSize:
+                  summary: Invalid batch size
+                  value:
+                    success: false
+                    error: Batch size must be between 100 and 10000
+        '422':
+          description: Unprocessable entity - Missing required fields
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                missingDates:
+                  summary: Missing date fields
+                  value:
+                    success: false
+                    error: start_date and end_date are required for date range extraction
+                missingUserIds:
+                  summary: Missing user IDs
+                  value:
+                    success: false
+                    error: user_ids array is required and must contain at least one ID
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/reset:
+    post:
+      tags:
+        - Job Management
+      summary: Reset job status
+      description: Reset the job status to 'not_started' and clear all progress data
+      operationId: resetStatus
+      responses:
+        '200':
+          description: Status reset successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Status reset successfully
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/stop:
+    post:
+      tags:
+        - Job Management
+      summary: Stop running extraction job
+      description: Stop the currently running extraction job gracefully
+      operationId: stopExtraction
+      responses:
+        '200':
+          description: Extraction stopped successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Extraction stopped successfully
+        '400':
+          description: No extraction running
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                success: false
+                error: No extraction is currently running
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/download:
+    get:
+      tags:
+        - File Management
+      summary: Download extraction or output file
+      description: Download a specific extraction or output file by filename
+      operationId: downloadFile
+      parameters:
+        - name: filename
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Name of the file to download
+          example: extraction_20260419_143122.json
+      responses:
+        '200':
+          description: File downloaded successfully
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          description: Filename parameter missing
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: filename parameter is required
+        '404':
+          description: File not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: File not found
+
+  /api/view:
+    get:
+      tags:
+        - File Management
+      summary: View file contents
+      description: View the contents of an extraction or output file
+      operationId: viewFile
+      parameters:
+        - name: filename
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Name of the file to view
+          example: extraction_20260419_143122.json
+      responses:
+        '200':
+          description: File contents
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  filename:
+                    type: string
+                  content:
+                    type: array
+                    items:
+                      type: object
+        '400':
+          description: Filename parameter missing
+        '404':
+          description: File not found
+
+  /api/extractions:
+    get:
+      tags:
+        - File Management
+      summary: List all extraction files
+      description: Get a list of all extraction files with metadata
+      operationId: listExtractions
+      responses:
+        '200':
+          description: List of extraction files
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  extractions:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        filename:
+                          type: string
+                        size:
+                          type: integer
+                        created:
+                          type: string
+                        record_count:
+                          type: integer
+
+  /api/history:
+    get:
+      tags:
+        - History
+      summary: Get extraction history
+      description: Retrieve the history of all extraction jobs
+      operationId: getHistory
+      responses:
+        '200':
+          description: Extraction history
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  history:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/HistoryEntry'
+
+  /api/users/process-pipeline:
+    post:
+      tags:
+        - User Processing
+      summary: Run complete user processing pipeline
+      description: |
+        Run the complete user processing pipeline:
+        1. Split users by active/inactive status
+        2. Filter active users by login date
+        3. Apply validation filters
+        
+        This endpoint processes a previously extracted file through the validation pipeline.
+      operationId: processUserPipeline
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - input_file
+              properties:
+                input_file:
+                  type: string
+                  example: backend/extractions/extraction_20260419_143122.json
+                  description: Path to the input extraction file
+                days_threshold:
+                  type: integer
+                  default: 1095
+                  example: 1095
+                  description: Number of days for dormancy threshold (default 1095 = 3 years)
+                output_dir:
+                  type: string
+                  default: backend/resolutions
+                  example: backend/resolutions
+                  description: Output directory for processed files
+      responses:
+        '200':
+          description: Pipeline completed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  active_users:
+                    type: integer
+                    example: 150
+                  inactive_users:
+                    type: integer
+                    example: 50
+                  dormant_users:
+                    type: integer
+                    example: 30
+                  output_files:
+                    type: array
+                    items:
+                      type: string
+        '400':
+          description: Bad request - Invalid input
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: input_file is required
+        '422':
+          description: Unprocessable entity - Missing required fields
+        '500':
+          description: Internal server error
+
+components:
+  schemas:
+    JobStatus:
+      type: object
+      properties:
+        status:
+          type: string
+          enum:
+            - not_started
+            - under_processing
+            - completed
+            - failed
+            - stopped
+          example: under_processing
+        current_month:
+          type: string
+          example: '2020-04'
+        records_processed:
+          type: integer
+          example: 1500
+        progress_percent:
+          type: number
+          format: float
+          example: 45.5
+        start_date:
+          type: string
+          example: '2020-01-01'
+        end_date:
+          type: string
+          example: '2020-12-31'
+        total_months:
+          type: integer
+          example: 12
+        completed_months:
+          type: integer
+          example: 5
+        error:
+          type: string
+          nullable: true
+        last_updated:
+          type: string
+          example: '2026-04-19T10:30:00'
+
+    Filter:
+      type: object
+      properties:
+        id:
+          type: string
+          example: dormancy_check
+        name:
+          type: string
+          example: Dormancy Check
+        description:
+          type: string
+          example: Check for dormant accounts (3+ years inactive)
+
+    DateRangeRequest:
+      type: object
+      required:
+        - extraction_mode
+        - start_date
+        - end_date
+      properties:
+        extraction_mode:
+          type: string
+          enum:
+            - date_range
+          example: date_range
+          description: Mode 1 - Extract data from Cloudant by date range
+        start_date:
+          type: string
+          example: '2020-04-15'
+          description: Start date (YYYY-MM-DD, YYYY-MM-DD HH:MM, or YYYY-MM-DD HH:MM:SS)
+        end_date:
+          type: string
+          example: '2020-04-15'
+          description: End date (YYYY-MM-DD, YYYY-MM-DD HH:MM, or YYYY-MM-DD HH:MM:SS)
+        filters:
+          type: object
+          description: Optional filters to apply during validation pipeline
+          additionalProperties:
+            type: boolean
+          example:
+            dormancy_check: true
+            federated_id_removal: true
+            isv_validation: true
+        batch_size:
+          type: integer
+          minimum: 100
+          maximum: 10000
+          default: 3000
+          example: 3000
+          description: Number of records to process per batch
+
+    SpecificIdsRequest:
+      type: object
+      required:
+        - extraction_mode
+        - user_ids
+      properties:
+        extraction_mode:
+          type: string
+          enum:
+            - specific_ids
+          example: specific_ids
+          description: Mode 2 - Validate specific user IDs via ISV
+        user_ids:
+          type: array
+          items:
+            type: string
+          example:
+            - user1@ibm.com
+            - user2@ibm.com
+          description: List of user IDs to validate
+        filters:
+          type: object
+          description: Optional filters to apply during validation
+          additionalProperties:
+            type: boolean
+          example:
+            isv_validation: true
+        batch_size:
+          type: integer
+          minimum: 100
+          maximum: 10000
+          default: 3000
+          example: 3000
+
+    ExtractionStartResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: Data retrieval started successfully
+        extraction_mode:
+          type: string
+          example: date_range
+        start_date:
+          type: string
+          example: '2020-04-15'
+        end_date:
+          type: string
+          example: '2020-04-15'
+        user_count:
+          type: integer
+          example: 3
+          description: Only present for specific_ids mode
+
+    HistoryEntry:
+      type: object
+      properties:
+        id:
+          type: string
+        start_date:
+          type: string
+        end_date:
+          type: string
+        status:
+          type: string
+        records_processed:
+          type: integer
+        timestamp:
+          type: string
+
+    Error:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: string
+          example: Error message
+
+  /api/validate/isv:
+    post:
+      tags:
+        - Validation Pipeline
+      summary: Validate users against ISV
+      description: |
+        Validate users against IBM ISV (IBM Users API).
+        
+        This endpoint checks if users exist in the ISV system and retrieves their current status.
+        Useful for verifying user accounts before further processing.
+      operationId: validateIsv
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - input_file
+              properties:
+                input_file:
+                  type: string
+                  example: backend/extractions/extraction_20260419_143122.json
+                  description: Path to the input extraction file
+                output_dir:
+                  type: string
+                  default: backend/outputs
+                  example: backend/outputs
+                  description: Output directory for validated files
+                batch_size:
+                  type: integer
+                  default: 100
+                  example: 100
+                  description: Number of users to process per batch
+                max_concurrent:
+                  type: integer
+                  default: 50
+                  example: 50
+                  description: Maximum concurrent API requests
+      responses:
+        '200':
+          description: ISV validation completed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  validated_users:
+                    type: integer
+                    example: 150
+                  invalid_users:
+                    type: integer
+                    example: 10
+                  output_file:
+                    type: string
+                    example: backend/outputs/isv_resolved_users_20260419_143122.json
+        '400':
+          description: Bad request - Invalid input
+        '500':
+          description: Internal server error
+
+  /api/validate/bluepages:
+    post:
+      tags:
+        - Validation Pipeline
+      summary: Validate users against IBM BluPages
+      description: |
+        Validate users against IBM BluPages directory.
+        
+        This endpoint checks if users exist in the IBM BluPages system and retrieves
+        their current directory information. Useful for verifying IBM employee status.
+      operationId: validateBluepages
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - input_file
+              properties:
+                input_file:
+                  type: string
+                  example: backend/outputs/isv_last_login_>3_20260419_143122.json
+                  description: Path to the input file (typically dormant users)
+                output_dir:
+                  type: string
+                  default: backend/outputs
+                  example: backend/outputs
+                  description: Output directory for validated files
+                timestamp:
+                  type: string
+                  example: '20260419_143122'
+                  description: Optional timestamp for output files
+                max_concurrent:
+                  type: integer
+                  default: 50
+                  example: 50
+                  description: Maximum concurrent API requests
+                batch_size:
+                  type: integer
+                  default: 100
+                  example: 100
+                  description: Number of users to process per batch
+      responses:
+        '200':
+          description: BluPages validation completed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  validated_users:
+                    type: integer
+                    example: 70
+                  not_found_users:
+                    type: integer
+                    example: 10
+                  output_file:
+                    type: string
+                    example: backend/outputs/bluepages_validated_20260419_143122.json
+        '400':
+          description: Bad request - Invalid input
+        '500':
+          description: Internal server error
+
+  /api/validate/pipeline:
+    post:
+      tags:
+        - Validation Pipeline
+      summary: Run complete validation pipeline
+      description: |
+        Run the complete validation pipeline with selected checks.
+        
+        **Pipeline Steps:**
+        1. ISV Validation - Validate against IBM Users API
+        2. Active Status Check - Split by active/inactive
+        3. Last Login Check - Filter by 3-year threshold
+        4. BluPages Validation - Validate against IBM BluPages
+        
+        You can select which checks to run by providing a checks array.
+      operationId: validatePipeline
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - input_file
+              properties:
+                input_file:
+                  type: string
+                  example: backend/extractions/extraction_20260419_143122.json
+                  description: Path to the input extraction file
+                output_dir:
+                  type: string
+                  default: backend/outputs
+                  example: backend/outputs
+                  description: Output directory for all pipeline files
+                checks:
+                  type: array
+                  items:
+                    type: string
+                    enum:
+                      - isv
+                      - active_status
+                      - last_login
+                      - bluepages
+                  example:
+                    - isv
+                    - active_status
+                    - last_login
+                    - bluepages
+                  description: List of validation checks to run
+                days_threshold:
+                  type: integer
+                  default: 1095
+                  example: 1095
+                  description: Days threshold for last login check (3 years = 1095 days)
+                max_concurrent:
+                  type: integer
+                  default: 50
+                  example: 50
+                  description: Maximum concurrent API requests
+      responses:
+        '200':
+          description: Pipeline completed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  pipeline_results:
+                    type: object
+                    properties:
+                      isv:
+                        type: object
+                      active_status:
+                        type: object
+                      last_login:
+                        type: object
+                      bluepages:
+                        type: object
+                  final_output:
+                    type: string
+                    example: backend/outputs/final_validated_20260419_143122.json
+        '400':
+          description: Bad request - Invalid input
+        '500':
+          description: Internal server error
+
+
+# Made with Bob
