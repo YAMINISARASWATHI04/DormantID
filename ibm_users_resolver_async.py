@@ -253,7 +253,19 @@ class IBMUsersResolverAsync:
                             
                             if resources and len(resources) > 0:
                                 resource = resources[0]
-                                email = resource.get('userName')
+                                
+                                # Extract email from Resources[].emails[].value field
+                                # This is more reliable than userName which may not contain email
+                                email = None
+                                emails_list = resource.get('emails', [])
+                                if emails_list and len(emails_list) > 0:
+                                    # Use the first email's value field
+                                    email = emails_list[0].get('value')
+                                
+                                # Fallback to userName if emails field is not available
+                                if not email:
+                                    email = resource.get('userName')
+                                
                                 active = resource.get('active', True)
                                 
                                 # Extract lastLogin from IBM extension schema
