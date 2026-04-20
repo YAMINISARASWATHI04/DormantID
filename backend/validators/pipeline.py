@@ -234,27 +234,11 @@ async def run_validation_pipeline(
             
             print(f"  IBM emails: {len(ibm_users)}, Non-IBM emails: {len(non_ibm_users)}")
             
-            # Get absolute path to project root
-            import os
-            current_file_path = os.path.abspath(__file__)
-            validators_dir = os.path.dirname(current_file_path)
-            backend_dir = os.path.dirname(validators_dir)
-            project_root = os.path.dirname(backend_dir)
-            outputs_dir = Path(project_root) / "backend" / "outputs"
-            outputs_dir.mkdir(parents=True, exist_ok=True)
-            
-            # Store non-IBM users separately with a marker for decision engine
-            non_ibm_file = None
+            # Mark non-IBM users as skipping BluPages check (for decision engine)
             if non_ibm_users:
-                non_ibm_file = outputs_dir / f"non_ibm_emails_{timestamp}.json"
-                
-                # Mark these users as skipping BluPages check
                 for user in non_ibm_users:
                     user['skip_bluepages'] = True
                     user['skip_reason'] = 'Non-IBM Email Domain'
-                
-                with open(non_ibm_file, 'w') as f:
-                    json.dump(non_ibm_users, f, indent=2)
             
             # Run BluPages validation only on IBM users - pass data directly
             if ibm_users:
@@ -267,11 +251,11 @@ async def run_validation_pipeline(
                 )
                 results["bluepages"] = result
                 
-                # Add non-IBM users info to results for decision engine
+                # Add non-IBM users data directly to results for decision engine
                 if non_ibm_users:
                     results["bluepages"]["non_ibm_users"] = {
                         "count": len(non_ibm_users),
-                        "file": str(non_ibm_file)
+                        "data": non_ibm_users
                     }
                 
                 checks_run.append("bluepages")
@@ -318,11 +302,11 @@ async def run_validation_pipeline(
                     }
                 }
                 
-                # Add non-IBM users info to results for decision engine
+                # Add non-IBM users data directly to results for decision engine
                 if non_ibm_users:
                     results["bluepages"]["non_ibm_users"] = {
                         "count": len(non_ibm_users),
-                        "file": str(non_ibm_file)
+                        "data": non_ibm_users
                     }
                     summary["non_ibm_emails"] = len(non_ibm_users)
                     summary["to_delete"] = len(non_ibm_users)

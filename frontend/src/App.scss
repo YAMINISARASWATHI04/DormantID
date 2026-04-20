@@ -306,6 +306,7 @@
 }
 
 // Extraction Settings Section - Horizontal Row Layout with Reduced Width
+// Extraction Settings Section - Horizontal Row Layout with Reduced Width
 .extraction-settings-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -318,12 +319,6 @@
     gap: $spacing-05;
   }
 
-  // Limit width of input containers
-  .cds--number-input,
-  .threshold-input-wrapper {
-    max-width: 320px; // Reduced from full width
-  }
-
   .cds--label {
     font-weight: 600;
     font-size: 0.875rem;
@@ -331,7 +326,11 @@
     color: $text-primary;
   }
 
-  // Make the input box WHITE with light border
+  // Constrain Batch Size to same width as Last Login Limit input
+  .cds--number-input {
+    max-width: 160px;
+  }
+
   .cds--number-input__input-wrapper {
     background-color: #FFFFFF;
     border: 1px solid #E0E0E0;
@@ -370,39 +369,64 @@
     font-size: 0.75rem;
     margin-top: $spacing-02;
   }
+  .cds--number-input__input-wrapper {
+     width: 100% !important;
+    }
 }
 
-// Threshold Input Wrapper - Clean Flexbox Layout
+  
+// Threshold Input Wrapper - Dropdown aligned to input top, label above group
 .threshold-input-wrapper {
-  max-width: 100%;
+  max-width: 280px;
+
+  // Move Carbon's label to sit above the whole group
+  > .cds--form-item > .cds--label,
+  .cds--number > .cds--label {
+    display: block;
+    font-weight: 600;
+    font-size: 0.875rem;
+    margin-bottom: $spacing-03;
+    color: $text-primary;
+  }
 
   .threshold-input-group {
     display: flex;
-    gap: $spacing-03; // Use gap for spacing, not margins
-    align-items: flex-end; // Align both at bottom baseline
-    flex-wrap: nowrap; // Keep on same line
-    max-width: 400px; // Reasonable max width for the group
+    gap: $spacing-03;
+    align-items: flex-start; // tops aligned so label row lines up
+    flex-wrap: nowrap;
 
-    // NumberInput takes remaining space
+    // NumberInput: fixed width, label visible
     .cds--number-input {
       flex: 1 1 auto;
-      min-width: 150px;
-      max-width: 250px;
+      min-width: 120px;
+      max-width: 160px;
     }
 
-    // Dropdown has fixed width
+    // Dropdown column: manually add a label spacer so input boxes align
     .threshold-unit-select-wrapper {
-      flex: 0 0 120px;
-      
-      // Remove ALL default margins and padding from Carbon components
+      flex: 0 0 110px;
+      display: flex;
+      flex-direction: column;
+
+      // Invisible spacer that matches the label height above the number input
+      &::before {
+        content: '\00a0'; // non-breaking space
+        display: block;
+        font-size: 0.875rem;
+        font-weight: 600;
+        line-height: 1.29; // matches Carbon label line-height
+        margin-bottom: $spacing-03;
+        visibility: hidden;
+      }
+
+      // Strip all Carbon form-item spacing
       .cds--form-item,
       .threshold-unit-select-inline,
       .cds--select {
         margin: 0 !important;
         padding: 0;
       }
-      
-      // Completely hide the label (no space)
+
       .cds--label {
         display: none !important;
         height: 0 !important;
@@ -410,33 +434,39 @@
         padding: 0 !important;
       }
 
-      // Ensure select wrapper doesn't add spacing
       .cds--select-input__wrapper {
         margin: 0 !important;
       }
 
-      // Style the select input to match NumberInput
+      // Match NumberInput box exactly
       .cds--select-input {
         background-color: #FFFFFF;
         border: 1px solid #E0E0E0;
         border-radius: 4px;
-        height: 2.5rem; // Match NumberInput height (40px)
+        height: 2.5rem;
         line-height: 2.5rem;
         width: 100%;
         margin: 0 !important;
+        padding: 0 2.5rem 0 0.75rem;
+        font-size: 0.875rem;
+        font-weight: 400;
+        color: $text-primary;
 
         &:hover {
           background-color: #FFFFFF;
+          border-color: #8D8D8D;
         }
 
         &:focus {
           outline: 2px solid #0F62FE;
           outline-offset: -2px;
+          background-color: #FFFFFF;
         }
 
         &:disabled {
           background-color: #F4F4F4;
           color: $text-disabled;
+          border-color: #E0E0E0;
         }
       }
     }

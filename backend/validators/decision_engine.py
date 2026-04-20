@@ -123,12 +123,9 @@ def consolidate_decisions(
             
             # Process non-IBM users first (skipped BluPages validation)
             non_ibm_info = bluepages_result.get("non_ibm_users", {})
-            non_ibm_file = non_ibm_info.get("file")
+            non_ibm_users = non_ibm_info.get("data", [])
             
-            if non_ibm_file and Path(non_ibm_file).exists():
-                with open(non_ibm_file, 'r') as f:
-                    non_ibm_users = json.load(f)
-                
+            if non_ibm_users:
                 for user in non_ibm_users:
                     user_id = user.get("user_id", user.get("id", ""))
                     if user_id not in processed_ids:

@@ -648,18 +648,20 @@ function App() {
 
         <AccordionItem title="Extraction Settings" open>
           <div className="extraction-settings-row">
-            <NumberInput
-              id="batch-size"
-              label="Batch Size"
-              helperText="Number of records per batch (1000-5000 recommended)"
-              min={100}
-              max={10000}
-              step={100}
-              value={batchSize}
-              onChange={(e, { value }) => setBatchSize(value)}
-              disabled={isDisabled}
-              invalidText="Batch size must be between 100 and 10000"
-            />
+            <div style={{ maxWidth: '200px', width: '200px' }}>
+              <NumberInput
+                id="batch-size"
+                label="Batch Size"
+                helperText="Number of records per batch (1000-5000 recommended)"
+                min={100}
+                max={10000}
+                step={100}
+                value={batchSize}
+                onChange={(e, { value }) => setBatchSize(value)}
+                disabled={isDisabled}
+                invalidText="Batch size must be between 100 and 10000"
+              />
+            </div>
 
             <div className="threshold-input-wrapper">
               <div className="threshold-input-group">
