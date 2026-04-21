@@ -104,9 +104,26 @@ async def run_validation_pipeline(
                 "bluepages": True
             }
         
-        # Validate input file
+        # Validate input file - return error dict instead of raising exception
         if not Path(input_file).exists():
-            raise PipelineError(f"Input file not found: {input_file}")
+            return {
+                "success": False,
+                "error": f"Input file not found: {input_file}",
+                "pipeline": "validation_pipeline",
+                "timestamp": datetime.now().isoformat()
+            }
+        
+        # Validate JSON format - return error dict for corrupted files
+        try:
+            with open(input_file, 'r') as f:
+                initial_data = json.load(f)
+        except json.JSONDecodeError as e:
+            return {
+                "success": False,
+                "error": f"Invalid JSON format in input file: {str(e)}",
+                "pipeline": "validation_pipeline",
+                "timestamp": datetime.now().isoformat()
+            }
         
         # Track results from each step
         results = {}
@@ -115,7 +132,7 @@ async def run_validation_pipeline(
         
         # Summary statistics
         summary = {
-            "total_input": 0,
+            "total_input": len(initial_data),
             "found_in_isv": 0,
             "not_found_in_isv": 0,
             "active": 0,
@@ -127,11 +144,6 @@ async def run_validation_pipeline(
             "to_delete": 0,
             "not_to_delete": 0
         }
-        
-        # Get initial count
-        with open(input_file, 'r') as f:
-            initial_data = json.load(f)
-            summary["total_input"] = len(initial_data)
         
         print(f"\n{'='*70}")
         print(f"VALIDATION PIPELINE - Starting")
@@ -281,13 +293,8 @@ async def run_validation_pipeline(
                 if status_callback:
                     status_callback("BluPages Validation", "completed")
                 
-                # Get absolute path to project root
-                import os
-                current_file = os.path.abspath(__file__)
-                validators_dir = os.path.dirname(current_file)
-                backend_dir = os.path.dirname(validators_dir)
-                project_root = os.path.dirname(backend_dir)
-                outputs_dir = Path(project_root) / "backend" / "outputs"
+                # Use the provided output_dir parameter
+                outputs_dir = Path(output_dir)
                 outputs_dir.mkdir(parents=True, exist_ok=True)
                 to_delete_file = outputs_dir / f"to_be_deleted_{timestamp}.json"
                 
@@ -396,19 +403,14 @@ async def run_validation_pipeline(
                         if file_path != decision_result["output_file"]:
                             files_to_remove.append(file_path)
         
-        # Also clean up ALL files in outputs directory except the final decision file
+        # Also clean up ALL files in output directory except the final decision file
         # This catches any files created directly by validators
-        import os
-        current_file = os.path.abspath(__file__)
-        validators_dir = os.path.dirname(current_file)
-        backend_dir = os.path.dirname(validators_dir)
-        project_root = os.path.dirname(backend_dir)
-        outputs_dir = Path(project_root) / "backend" / "outputs"
+        outputs_dir = Path(output_dir)
         
         if outputs_dir.exists():
             for file_path in outputs_dir.glob("*.json"):
                 # Keep only the final decision file
-                if str(file_path) != decision_result["output_file"] and file_path not in files_to_remove:
+                if str(file_path) != decision_result["output_file"] and str(file_path) not in files_to_remove:
                     files_to_remove.append(str(file_path))
         
         # Remove intermediate files

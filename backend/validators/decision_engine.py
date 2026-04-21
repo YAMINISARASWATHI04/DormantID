@@ -237,9 +237,17 @@ def consolidate_decisions(
         output_path = Path(output_file)
         output_path.parent.mkdir(parents=True, exist_ok=True)
         
-        # Save consolidated decisions
+        # Save consolidated decisions with wrapper for consistency
+        output_data = {
+            "decisions": decisions,
+            "metadata": {
+                "timestamp": datetime.now().isoformat(),
+                "threshold_days": threshold_days,
+                "threshold_years": threshold_years
+            }
+        }
         with open(output_file, 'w', encoding='utf-8') as f:
-            json.dump(decisions, f, indent=2, ensure_ascii=False)
+            json.dump(output_data, f, indent=2, ensure_ascii=False)
         
         # Print summary
         print(f"\n{'='*70}")

@@ -56,7 +56,16 @@ function ViewData() {
       console.log('Received data:', response.data);
       console.log('Data type:', Array.isArray(response.data) ? 'Array' : 'Object');
       console.log('Keys:', Object.keys(response.data));
-      setData(response.data);
+      
+      // Handle new data structure with 'decisions' wrapper
+      let processedData = response.data;
+      if (response.data.decisions) {
+        // New structure: {decisions: {...}, metadata: {...}}
+        processedData = response.data.decisions;
+        console.log('Using new data structure with decisions wrapper');
+      }
+      
+      setData(processedData);
       setError(null);
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to load data');
