@@ -188,11 +188,47 @@ def mock_history_file(temp_dir, sample_history):
     return file_path
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture(scope="session", autouse=True)
 def cleanup_test_files():
-    """Cleanup test files after each test."""
-    yield
-    # Cleanup logic can be added here if needed
-    pass
+    """
+    Automatically cleanup intermediate files after all tests complete.
+    
+    This fixture runs once after the entire test session to remove intermediate
+    files created by validators, keeping only the consolidated decision files.
+    Changed from function scope to session scope to allow tests to access
+    intermediate files during execution.
+    """
+    yield  # Let all tests run first
+    
+    # Get the outputs directory paths
+    backend_dir = Path(__file__).parent.parent
+    outputs_dirs = [
+        backend_dir / "outputs",
+        backend_dir / "backend" / "outputs"  # Handle nested backend/backend/outputs
+    ]
+    
+    # Patterns for intermediate files to remove
+    intermediate_patterns = [
+        "isv_resolved_users_*.json",
+        "isv_failed_ids_*.json",
+        "isv_active_users_*.json",
+        "isv_inactive_users_*.json",
+        "isv_last_login_>3_*.json",
+        "to_be_deleted_*.json",
+        "not_to_be_deleted.json",
+        "temp_*.json"
+    ]
+    
+    # Clean up both possible outputs directories after all tests
+    for outputs_dir in outputs_dirs:
+        if outputs_dir.exists():
+            # Remove intermediate files
+            for pattern in intermediate_patterns:
+                for file_path in outputs_dir.glob(pattern):
+                    try:
+                        file_path.unlink()
+                    except Exception:
+                        # Silently ignore errors during cleanup
+                        pass
 
 # Made with Bob

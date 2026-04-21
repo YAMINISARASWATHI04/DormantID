@@ -1,10 +1,10 @@
 {
   "processed_count": 3,
-  "timestamp": "2026-04-20T12:15:55.920700",
+  "timestamp": "2026-04-20T21:13:47.323951",
   "results": {
-    "100000HVXG": {
-      "email": "rothbauer@cngroup.dk",
-      "lastLogin": "2022-04-01T15:12:55Z",
+    "0600017MEM": {
+      "email": "t.mansoor@csuohio.edu",
+      "lastLogin": "2022-04-01T13:50:57Z",
       "active": true
     },
     "060001766S": {
@@ -12,9 +12,9 @@
       "lastLogin": "2024-07-06T11:27:19Z",
       "active": true
     },
-    "0600017MEM": {
-      "email": "t.mansoor@csuohio.edu",
-      "lastLogin": "2022-04-01T13:50:57Z",
+    "100000HVXG": {
+      "email": "rothbauer@cngroup.dk",
+      "lastLogin": "2022-04-01T15:12:55Z",
       "active": true
     }
   }

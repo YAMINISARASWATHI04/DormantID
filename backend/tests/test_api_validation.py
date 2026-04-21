@@ -20,7 +20,7 @@ class TestValidationEndpoints:
         """Test POST /api/validate/isv successfully validates users"""
         request_data = {
             'input_file': mock_extraction_file,
-            'output_dir': 'backend/resolutions',
+            'output_dir': 'backend/outputs',
             'batch_size': 100,
             'max_concurrent': 50
         }
@@ -34,8 +34,8 @@ class TestValidationEndpoints:
                 'not_found_in_isv': 5
             },
             'files_created': {
-                'resolved': 'backend/resolutions/isv_resolved_users.json',
-                'failed': 'backend/resolutions/isv_failed_ids.json'
+                'resolved': 'backend/outputs/isv_resolved_users.json',
+                'failed': 'backend/outputs/isv_failed_ids.json'
             }
         }
         
@@ -55,7 +55,7 @@ class TestValidationEndpoints:
     def test_validate_isv_missing_input_file(self, client):
         """Test POST /api/validate/isv fails without input_file"""
         request_data = {
-            'output_dir': 'backend/resolutions'
+            'output_dir': 'backend/outputs'
         }
         
         response = client.post(
@@ -72,7 +72,7 @@ class TestValidationEndpoints:
         """Test POST /api/validate/active-status successfully splits users"""
         request_data = {
             'input_file': mock_extraction_file,
-            'output_dir': 'backend/resolutions',
+            'output_dir': 'backend/outputs',
             'timestamp': '20260419_120000'
         }
         
@@ -85,8 +85,8 @@ class TestValidationEndpoints:
                 'inactive': 20
             },
             'files_created': {
-                'active': 'backend/resolutions/isv_active_users.json',
-                'inactive': 'backend/resolutions/isv_inactive_users.json'
+                'active': 'backend/outputs/isv_active_users.json',
+                'inactive': 'backend/outputs/isv_inactive_users.json'
             }
         }
         
@@ -122,7 +122,7 @@ class TestValidationEndpoints:
         request_data = {
             'input_file': mock_extraction_file,
             'days_threshold': 1095,
-            'output_dir': 'backend/resolutions',
+            'output_dir': 'backend/outputs',
             'timestamp': '20260419_120000',
             'append_recent': True
         }
@@ -136,8 +136,8 @@ class TestValidationEndpoints:
                 'recent_login': 50
             },
             'files_created': {
-                'old_login': 'backend/resolutions/isv_last_login_old.json',
-                'recent_login': 'backend/resolutions/isv_last_login_recent.json'
+                'old_login': 'backend/outputs/isv_last_login_old.json',
+                'recent_login': 'backend/outputs/isv_last_login_recent.json'
             }
         }
         
@@ -159,7 +159,7 @@ class TestValidationEndpoints:
         request_data = {
             'input_file': mock_extraction_file,
             'days_threshold': 730,  # 2 years
-            'output_dir': 'backend/resolutions'
+            'output_dir': 'backend/outputs'
         }
         
         mock_result = {
@@ -188,7 +188,7 @@ class TestValidationEndpoints:
         """Test POST /api/validate/bluepages successfully validates against BluPages"""
         request_data = {
             'input_file': mock_extraction_file,
-            'output_dir': 'backend/resolutions',
+            'output_dir': 'backend/outputs',
             'timestamp': '20260419_120000',
             'max_concurrent': 50,
             'batch_size': 100
@@ -226,7 +226,7 @@ class TestValidationEndpoints:
         """Test POST /api/validate/pipeline runs complete pipeline"""
         request_data = {
             'input_file': mock_extraction_file,
-            'output_dir': 'backend/resolutions',
+            'output_dir': 'backend/outputs',
             'checks': {
                 'isv_validation': True,
                 'active_status': True,

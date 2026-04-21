@@ -132,13 +132,13 @@ class TestUserFilteringEndpoints:
         """Test POST /api/users/split-by-status successfully splits users"""
         request_data = {
             'input_file': mock_extraction_file,
-            'output_dir': 'backend/resolutions'
+            'output_dir': 'backend/outputs'
         }
         
         with patch('app.user_filters.split_by_active_status') as mock_split:
             mock_split.return_value = (
-                'backend/resolutions/active_users.json',
-                'backend/resolutions/inactive_users.json',
+                'backend/outputs/active_users.json',
+                'backend/outputs/inactive_users.json',
                 80,
                 20
             )
@@ -174,14 +174,14 @@ class TestUserFilteringEndpoints:
         request_data = {
             'input_file': mock_extraction_file,
             'days_threshold': 1095,
-            'output_dir': 'backend/resolutions',
+            'output_dir': 'backend/outputs',
             'append_recent': True
         }
         
         with patch('app.user_filters.filter_by_login_date') as mock_filter:
             mock_filter.return_value = (
-                'backend/resolutions/old_login_users.json',
-                'backend/resolutions/recent_login_users.json',
+                'backend/outputs/old_login_users.json',
+                'backend/outputs/recent_login_users.json',
                 30,
                 50
             )
@@ -208,8 +208,8 @@ class TestUserFilteringEndpoints:
         
         with patch('app.user_filters.filter_by_login_date') as mock_filter:
             mock_filter.return_value = (
-                'backend/resolutions/old_login_users.json',
-                'backend/resolutions/recent_login_users.json',
+                'backend/outputs/old_login_users.json',
+                'backend/outputs/recent_login_users.json',
                 20,
                 60
             )
@@ -230,14 +230,14 @@ class TestUserFilteringEndpoints:
         request_data = {
             'input_file': mock_extraction_file,
             'days_threshold': 1095,
-            'output_dir': 'backend/resolutions'
+            'output_dir': 'backend/outputs'
         }
         
         mock_result = {
-            'active_file': 'backend/resolutions/active_users.json',
-            'inactive_file': 'backend/resolutions/inactive_users.json',
-            'old_login_file': 'backend/resolutions/old_login_users.json',
-            'recent_login_file': 'backend/resolutions/recent_login_users.json',
+            'active_file': 'backend/outputs/active_users.json',
+            'inactive_file': 'backend/outputs/inactive_users.json',
+            'old_login_file': 'backend/outputs/old_login_users.json',
+            'recent_login_file': 'backend/outputs/recent_login_users.json',
             'counts': {
                 'active': 80,
                 'inactive': 20,

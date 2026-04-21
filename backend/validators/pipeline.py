@@ -33,7 +33,7 @@ class PipelineError(Exception):
 
 async def run_validation_pipeline(
     input_file: str,
-    output_dir: str = "backend/resolutions",
+    output_dir: str = "backend/outputs",
     checks: Optional[Dict[str, bool]] = None,
     days_threshold: int = 1065,
     max_concurrent: int = 10,
@@ -388,6 +388,21 @@ async def run_validation_pipeline(
                         if file_path != decision_result["output_file"]:
                             files_to_remove.append(file_path)
         
+        # Also clean up ALL files in outputs directory except the final decision file
+        # This catches any files created directly by validators
+        import os
+        current_file = os.path.abspath(__file__)
+        validators_dir = os.path.dirname(current_file)
+        backend_dir = os.path.dirname(validators_dir)
+        project_root = os.path.dirname(backend_dir)
+        outputs_dir = Path(project_root) / "backend" / "outputs"
+        
+        if outputs_dir.exists():
+            for file_path in outputs_dir.glob("*.json"):
+                # Keep only the final decision file
+                if str(file_path) != decision_result["output_file"] and file_path not in files_to_remove:
+                    files_to_remove.append(str(file_path))
+        
         # Remove intermediate files
         removed_count = 0
         for file_path in files_to_remove:
@@ -408,7 +423,7 @@ async def run_validation_pipeline(
 
 def run_validation_pipeline_sync(
     input_file: str,
-    output_dir: str = "backend/resolutions",
+    output_dir: str = "backend/outputs",
     checks: Optional[Dict[str, bool]] = None,
     days_threshold: int = 1065,
     max_concurrent: int = 10,

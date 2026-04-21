@@ -50,9 +50,9 @@ class TestDecisionCategorization:
         with patch('backend.validators.decision_engine.consolidate_decisions', return_value=mock_result):
             result = consolidate_decisions(pipeline_results)
             
-            assert len(result['to_be_deleted']) == 1
-            assert result['to_be_deleted'][0]['id'] == 'user1@ibm.com'
-            assert any('BluPages Validation Failed' in reason for reason in result['to_be_deleted'][0]['reasons'])
+            assert len(result['decisions']['to_be_deleted']) == 1
+            assert result['decisions']['to_be_deleted'][0]['id'] == 'user1@ibm.com'
+            assert any('BluPages Validation Failed' in reason for reason in result['decisions']['to_be_deleted'][0]['reasons'])
     
     def test_categorize_not_to_be_deleted_recent_login(self):
         """Test users not deleted due to recent login"""
@@ -88,9 +88,9 @@ class TestDecisionCategorization:
         with patch('backend.validators.decision_engine.consolidate_decisions', return_value=mock_result):
             result = consolidate_decisions(pipeline_results)
             
-            assert len(result['not_to_be_deleted']) == 1
-            assert result['not_to_be_deleted'][0]['id'] == 'user2@ibm.com'
-            assert any('Last Login Check Passed' in reason for reason in result['not_to_be_deleted'][0]['reasons'])
+            assert len(result['decisions']['not_to_be_deleted']) == 1
+            assert result['decisions']['not_to_be_deleted'][0]['id'] == 'user2@ibm.com'
+            assert any('Last Login Check Passed' in reason for reason in result['decisions']['not_to_be_deleted'][0]['reasons'])
     
     def test_categorize_not_to_be_deleted_bluepages_pass(self):
         """Test users not deleted due to BluPages found"""
@@ -127,8 +127,8 @@ class TestDecisionCategorization:
         with patch('backend.validators.decision_engine.consolidate_decisions', return_value=mock_result):
             result = consolidate_decisions(pipeline_results)
             
-            assert len(result['not_to_be_deleted']) == 1
-            assert any('BluPages Validation Passed' in reason for reason in result['not_to_be_deleted'][0]['reasons'])
+            assert len(result['decisions']['not_to_be_deleted']) == 1
+            assert any('BluPages Validation Passed' in reason for reason in result['decisions']['not_to_be_deleted'][0]['reasons'])
     
     def test_categorize_isv_inactive_users(self):
         """Test ISV inactive users categorization"""
@@ -164,9 +164,9 @@ class TestDecisionCategorization:
         with patch('backend.validators.decision_engine.consolidate_decisions', return_value=mock_result):
             result = consolidate_decisions(pipeline_results)
             
-            assert len(result['isv_inactive_users']) == 1
-            assert result['isv_inactive_users'][0]['activeStatus'] is False
-            assert any('Active Status Check Failed' in reason for reason in result['isv_inactive_users'][0]['reasons'])
+            assert len(result['decisions']['isv_inactive_users']) == 1
+            assert result['decisions']['isv_inactive_users'][0]['activeStatus'] is False
+            assert any('Active Status Check Failed' in reason for reason in result['decisions']['isv_inactive_users'][0]['reasons'])
     
     def test_categorize_isv_failed_ids(self):
         """Test ISV failed IDs categorization"""
@@ -200,9 +200,9 @@ class TestDecisionCategorization:
         with patch('backend.validators.decision_engine.consolidate_decisions', return_value=mock_result):
             result = consolidate_decisions(pipeline_results)
             
-            assert len(result['isv_failed_ids']) == 1
-            assert result['isv_failed_ids'][0]['id'] == 'user5@ibm.com'
-            assert any('ISV Validation Failed' in reason for reason in result['isv_failed_ids'][0]['reasons'])
+            assert len(result['decisions']['isv_failed_ids']) == 1
+            assert result['decisions']['isv_failed_ids'][0]['id'] == 'user5@ibm.com'
+            assert any('ISV Validation Failed' in reason for reason in result['decisions']['isv_failed_ids'][0]['reasons'])
     
     def test_categorize_mixed_results(self):
         """Test with all categories having users"""
@@ -227,10 +227,10 @@ class TestDecisionCategorization:
         with patch('backend.validators.decision_engine.consolidate_decisions', return_value=mock_result):
             result = consolidate_decisions(pipeline_results)
             
-            assert len(result['to_be_deleted']) == 1
-            assert len(result['not_to_be_deleted']) == 2
-            assert len(result['isv_inactive_users']) == 1
-            assert len(result['isv_failed_ids']) == 1
+            assert len(result['decisions']['to_be_deleted']) == 1
+            assert len(result['decisions']['not_to_be_deleted']) == 2
+            assert len(result['decisions']['isv_inactive_users']) == 1
+            assert len(result['decisions']['isv_failed_ids']) == 1
     
     def test_categorize_empty_results(self):
         """Test with no users in any category"""
@@ -250,10 +250,10 @@ class TestDecisionCategorization:
         with patch('backend.validators.decision_engine.consolidate_decisions', return_value=mock_result):
             result = consolidate_decisions(pipeline_results)
             
-            assert len(result['to_be_deleted']) == 0
-            assert len(result['not_to_be_deleted']) == 0
-            assert len(result['isv_inactive_users']) == 0
-            assert len(result['isv_failed_ids']) == 0
+            assert len(result['decisions']['to_be_deleted']) == 0
+            assert len(result['decisions']['not_to_be_deleted']) == 0
+            assert len(result['decisions']['isv_inactive_users']) == 0
+            assert len(result['decisions']['isv_failed_ids']) == 0
     
     def test_categorize_priority_order(self):
         """Test that decision priority is correctly applied"""
@@ -290,8 +290,8 @@ class TestDecisionCategorization:
             result = consolidate_decisions(pipeline_results)
             
             # BluPages failure should be the final decision
-            assert len(result['to_be_deleted']) == 1
-            final_reason = result['to_be_deleted'][0]['reasons'][-1]
+            assert len(result['decisions']['to_be_deleted']) == 1
+            final_reason = result['decisions']['to_be_deleted'][0]['reasons'][-1]
             assert 'FINAL DECISION' in final_reason
             assert 'BluPages Validation Failed' in final_reason
 
@@ -323,7 +323,7 @@ class TestDecisionReasons:
         with patch('backend.validators.decision_engine.consolidate_decisions', return_value=mock_result):
             result = consolidate_decisions({})
             
-            reasons = result['to_be_deleted'][0]['reasons']
+            reasons = result['decisions']['to_be_deleted'][0]['reasons']
             assert isinstance(reasons, list)
             assert len(reasons) > 0
             assert all(isinstance(reason, str) for reason in reasons)
@@ -371,16 +371,16 @@ class TestDecisionReasons:
             result = consolidate_decisions({})
             
             # Check all categories have FINAL DECISION in their reasons
-            for user in result['to_be_deleted']:
+            for user in result['decisions']['to_be_deleted']:
                 assert any('FINAL DECISION' in reason for reason in user['reasons'])
             
-            for user in result['not_to_be_deleted']:
+            for user in result['decisions']['not_to_be_deleted']:
                 assert any('FINAL DECISION' in reason for reason in user['reasons'])
             
-            for user in result['isv_inactive_users']:
+            for user in result['decisions']['isv_inactive_users']:
                 assert any('FINAL DECISION' in reason for reason in user['reasons'])
             
-            for user in result['isv_failed_ids']:
+            for user in result['decisions']['isv_failed_ids']:
                 assert any('FINAL DECISION' in reason for reason in user['reasons'])
     
     def test_decision_reasons_threshold_days_included(self):
@@ -404,7 +404,7 @@ class TestDecisionReasons:
         with patch('backend.validators.decision_engine.consolidate_decisions', return_value=mock_result):
             result = consolidate_decisions({}, threshold_days=1065)
             
-            reason = result['not_to_be_deleted'][0]['reasons'][0]
+            reason = result['decisions']['not_to_be_deleted'][0]['reasons'][0]
             assert '1065 days' in reason or '≤1065' in reason
     
     def test_decision_reasons_multiple_checks(self):
@@ -431,7 +431,7 @@ class TestDecisionReasons:
         with patch('backend.validators.decision_engine.consolidate_decisions', return_value=mock_result):
             result = consolidate_decisions({})
             
-            reasons = result['to_be_deleted'][0]['reasons']
+            reasons = result['decisions']['to_be_deleted'][0]['reasons']
             # Should have multiple reasons from different checks
             assert len(reasons) >= 2
             # Last reason should be the final decision

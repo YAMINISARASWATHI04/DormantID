@@ -26,9 +26,10 @@ class LoginValidationError(Exception):
 def validate_last_login(
     input_file: str,
     days_threshold: int = 1065,
-    output_dir: str = "backend/resolutions",
+    output_dir: str = "backend/outputs",
     timestamp: Optional[str] = None,
-    append_recent: bool = True
+    append_recent: bool = True,
+    skip_file_creation: bool = False
 ) -> Dict:
     """
     Validate and filter users by last login date.
@@ -39,6 +40,7 @@ def validate_last_login(
         output_dir: Directory to save output files
         timestamp: Optional timestamp string for filenames (auto-generated if None)
         append_recent: If True, append recent users to existing not_to_be_deleted.json
+        skip_file_creation: If True, return data in-memory without creating files
         
     Returns:
         Dictionary with validation results:
@@ -53,6 +55,10 @@ def validate_last_login(
             "files_created": {
                 "old_login": "path/to/isv_last_login_>3.json",
                 "recent_login": "path/to/not_to_be_deleted.json"
+            },
+            "data": {  # Only present if skip_file_creation=True
+                "old_login_users": [...],
+                "recent_login_users": [...]
             },
             "threshold_days": 1065,
             "timestamp": "2026-04-06T10:00:00",
@@ -126,38 +132,40 @@ def validate_last_login(
         old_login_file = Path(output_dir) / f"isv_last_login_>3_{timestamp}.json"
         recent_login_file = outputs_dir / "not_to_be_deleted.json"  # Final output goes to outputs folder
         
-        # Save old login users
-        with open(old_login_file, 'w') as f:
-            json.dump(old_login_users, f, indent=2)
-        
-        # Save recent login users (with append logic)
-        if append_recent and recent_login_file.exists():
-            try:
-                with open(recent_login_file, 'r') as f:
-                    existing_users = json.load(f)
-                
-                # Avoid duplicates by user_id
-                existing_user_ids = {user['user_id'] for user in existing_users}
-                new_users = [user for user in recent_login_users if user['user_id'] not in existing_user_ids]
-                
-                combined_users = existing_users + new_users
-                
-                with open(recent_login_file, 'w') as f:
-                    json.dump(combined_users, f, indent=2)
-            except (json.JSONDecodeError, KeyError):
-                # If existing file is invalid, overwrite it
+        # Save files only if not skipping file creation
+        if not skip_file_creation:
+            # Save old login users
+            with open(old_login_file, 'w') as f:
+                json.dump(old_login_users, f, indent=2)
+            
+            # Save recent login users (with append logic)
+            if append_recent and recent_login_file.exists():
+                try:
+                    with open(recent_login_file, 'r') as f:
+                        existing_users = json.load(f)
+                    
+                    # Avoid duplicates by user_id
+                    existing_user_ids = {user['user_id'] for user in existing_users}
+                    new_users = [user for user in recent_login_users if user['user_id'] not in existing_user_ids]
+                    
+                    combined_users = existing_users + new_users
+                    
+                    with open(recent_login_file, 'w') as f:
+                        json.dump(combined_users, f, indent=2)
+                except (json.JSONDecodeError, KeyError):
+                    # If existing file is invalid, overwrite it
+                    with open(recent_login_file, 'w') as f:
+                        json.dump(recent_login_users, f, indent=2)
+            else:
                 with open(recent_login_file, 'w') as f:
                     json.dump(recent_login_users, f, indent=2)
-        else:
-            with open(recent_login_file, 'w') as f:
-                json.dump(recent_login_users, f, indent=2)
         
         # Calculate duration
         end_time = datetime.now()
         duration = (end_time - start_time).total_seconds()
         
-        # Return standardized result
-        return {
+        # Build result dictionary
+        result = {
             "success": True,
             "validator": "last_login",
             "input_count": input_count,
@@ -173,6 +181,15 @@ def validate_last_login(
             "timestamp": end_time.isoformat(),
             "duration_seconds": int(duration)
         }
+        
+        # Add in-memory data if skipping file creation
+        if skip_file_creation:
+            result["data"] = {
+                "old_login_users": old_login_users,
+                "recent_login_users": recent_login_users
+            }
+        
+        return result
         
     except Exception as e:
         raise LoginValidationError(f"Login validation failed: {str(e)}")

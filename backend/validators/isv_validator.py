@@ -18,12 +18,12 @@ import os
 from pathlib import Path
 from datetime import datetime
 from typing import Dict, List, Tuple, Optional
+import asyncio
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from ibm_users_resolver_async import IBMUsersResolverAsync
-import asyncio
 
 
 class ISVValidationError(Exception):
@@ -33,9 +33,10 @@ class ISVValidationError(Exception):
 
 async def validate_isv(
     input_file: str,
-    output_dir: str = "backend/resolutions",
+    output_dir: str = "backend/outputs",
     batch_size: int = 100,
-    max_concurrent: int = 10
+    max_concurrent: int = 10,
+    skip_file_creation: bool = False
 ) -> Dict:
     """
     Validate users against ISV (IBM Users API).
@@ -48,6 +49,7 @@ async def validate_isv(
         output_dir: Directory to save output files
         batch_size: Number of users to process per batch
         max_concurrent: Maximum concurrent API requests
+        skip_file_creation: If True, return data in-memory without creating files
         
     Returns:
         Dictionary with validation results:
@@ -62,6 +64,10 @@ async def validate_isv(
             "files_created": {
                 "resolved": "path/to/resolved_users.json",
                 "failed": "path/to/failed_ids.json"
+            },
+            "data": {  # Only present if skip_file_creation=True
+                "resolved_users": [...],
+                "failed_ids": [...]
             },
             "timestamp": "2026-04-06T10:00:00",
             "duration_seconds": 45
@@ -110,12 +116,18 @@ async def validate_isv(
         # Run resolution
         results = await resolver.resolve_all(list(user_ids))
         
+        # Get counts
+        resolved_count = len(results)
+        failed_count = input_count - resolved_count
+        
+        # Prepare resolved users list and failed IDs list
+        resolved_users = list(results.values())
+        failed_ids = [uid for uid in user_ids if uid not in results]
+        
         # Create output file paths
-        # Resolved users go to resolutions directory
         resolved_file = Path(output_dir) / f"isv_resolved_users_{timestamp}.json"
         
-        # Failed IDs go to outputs directory (always created even if empty)
-        # Use absolute path
+        # Failed IDs go to outputs directory
         import os
         current_file = os.path.abspath(__file__)
         validators_dir = os.path.dirname(current_file)
@@ -125,20 +137,17 @@ async def validate_isv(
         outputs_dir.mkdir(parents=True, exist_ok=True)
         failed_file = outputs_dir / f"isv_failed_ids_{timestamp}.json"
         
-        # Save results
-        resolver.save_results(results, str(resolved_file))
-        resolver.save_failed_ids(list(user_ids), set(results.keys()), str(failed_file))
-        
-        # Get counts
-        resolved_count = len(results)
-        failed_count = input_count - resolved_count
+        # Save results only if not skipping file creation
+        if not skip_file_creation:
+            resolver.save_results(results, str(resolved_file))
+            resolver.save_failed_ids(list(user_ids), set(results.keys()), str(failed_file))
         
         # Calculate duration
         end_time = datetime.now()
         duration = (end_time - start_time).total_seconds()
         
-        # Return standardized result
-        return {
+        # Build result dictionary
+        result = {
             "success": True,
             "validator": "isv_validation",
             "input_count": input_count,
@@ -154,22 +163,32 @@ async def validate_isv(
             "duration_seconds": int(duration)
         }
         
+        # Add in-memory data if skipping file creation
+        if skip_file_creation:
+            result["data"] = {
+                "resolved_users": resolved_users,
+                "failed_ids": failed_ids
+            }
+        
+        return result
+        
     except Exception as e:
         raise ISVValidationError(f"ISV validation failed: {str(e)}")
 
 
 def validate_isv_sync(
     input_file: str,
-    output_dir: str = "backend/resolutions",
+    output_dir: str = "backend/outputs",
     batch_size: int = 100,
-    max_concurrent: int = 50
+    max_concurrent: int = 50,
+    skip_file_creation: bool = False
 ) -> Dict:
     """
     Synchronous wrapper for validate_isv.
     
     Use this when calling from non-async code.
     """
-    return asyncio.run(validate_isv(input_file, output_dir, batch_size, max_concurrent))
+    return asyncio.run(validate_isv(input_file, output_dir, batch_size, max_concurrent, skip_file_creation))
 
 
 # For backward compatibility and direct usage

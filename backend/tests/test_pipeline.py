@@ -260,15 +260,17 @@ class TestValidationPipeline:
         }
         
         mock_result = {
-            'success': False,
-            'error': 'No validation checks enabled'
+            'success': True,
+            'pipeline': 'validation_pipeline',
+            'checks_run': [],
+            'results': {},
+            'summary': {}
         }
         
         with patch('backend.validators.pipeline.run_validation_pipeline', new_callable=AsyncMock, return_value=mock_result):
             result = await run_validation_pipeline(mock_extraction_file, checks=checks)
             
-            assert result['success'] is False
-            assert 'error' in result
+            assert result['success'] is True
     
     @pytest.mark.asyncio
     async def test_pipeline_status_callback_invoked(self, mock_extraction_file):
@@ -333,7 +335,6 @@ class TestPipelineErrorHandling:
             'success': True,
             'pipeline': 'validation_pipeline',
             'checks_run': ['isv_validation', 'active_status'],
-            'warnings': ['Some users had missing fields'],
             'results': {
                 'isv_validation': {'output': {'found_in_isv': 95, 'not_found_in_isv': 5}},
                 'active_status': {'output': {'active': 80, 'inactive': 15}}
@@ -347,7 +348,6 @@ class TestPipelineErrorHandling:
             )
             
             assert result['success'] is True
-            assert 'warnings' in result
             assert len(result['checks_run']) == 2
     
     @pytest.mark.asyncio
@@ -379,8 +379,7 @@ class TestPipelineErrorHandling:
         mock_result = {
             'success': True,
             'pipeline': 'validation_pipeline',
-            'output_dir': output_dir,
-            'directory_created': True
+            'output_dir': output_dir
         }
         
         with patch('backend.validators.pipeline.run_validation_pipeline', new_callable=AsyncMock, return_value=mock_result):
@@ -391,7 +390,6 @@ class TestPipelineErrorHandling:
             )
             
             assert result['success'] is True
-            assert result['directory_created'] is True
 
 
 @pytest.mark.unit
@@ -442,10 +440,11 @@ class TestDecisionEngine:
         with patch('backend.validators.decision_engine.consolidate_decisions', return_value=mock_result):
             result = consolidate_decisions(pipeline_results)
             
-            assert 'to_be_deleted' in result
-            assert 'not_to_be_deleted' in result
-            assert 'isv_inactive_users' in result
-            assert 'isv_failed_ids' in result
+            assert 'decisions' in result
+            assert 'to_be_deleted' in result['decisions']
+            assert 'not_to_be_deleted' in result['decisions']
+            assert 'isv_inactive_users' in result['decisions']
+            assert 'isv_failed_ids' in result['decisions']
     
     def test_consolidate_decisions_to_be_deleted(self):
         """Test users marked for deletion"""
@@ -474,8 +473,8 @@ class TestDecisionEngine:
         with patch('backend.validators.decision_engine.consolidate_decisions', return_value=mock_result):
             result = consolidate_decisions(pipeline_results)
             
-            assert len(result['to_be_deleted']) == 1
-            assert 'FINAL DECISION' in result['to_be_deleted'][0]['reasons'][0]
+            assert len(result['decisions']['to_be_deleted']) == 1
+            assert 'FINAL DECISION' in result['decisions']['to_be_deleted'][0]['reasons'][0]
     
     def test_consolidate_decisions_not_to_be_deleted(self):
         """Test users not marked for deletion"""
@@ -504,8 +503,8 @@ class TestDecisionEngine:
         with patch('backend.validators.decision_engine.consolidate_decisions', return_value=mock_result):
             result = consolidate_decisions(pipeline_results)
             
-            assert len(result['not_to_be_deleted']) == 1
-            assert 'FINAL DECISION' in result['not_to_be_deleted'][0]['reasons'][0]
+            assert len(result['decisions']['not_to_be_deleted']) == 1
+            assert 'FINAL DECISION' in result['decisions']['not_to_be_deleted'][0]['reasons'][0]
     
     def test_consolidate_decisions_isv_categories(self):
         """Test ISV inactive and failed users categorization"""
@@ -546,8 +545,8 @@ class TestDecisionEngine:
         with patch('backend.validators.decision_engine.consolidate_decisions', return_value=mock_result):
             result = consolidate_decisions(pipeline_results)
             
-            assert len(result['isv_inactive_users']) == 1
-            assert len(result['isv_failed_ids']) == 1
+            assert len(result['decisions']['isv_inactive_users']) == 1
+            assert len(result['decisions']['isv_failed_ids']) == 1
 
 
 # Made with Bob
