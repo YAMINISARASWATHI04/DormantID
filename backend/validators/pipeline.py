@@ -9,6 +9,7 @@ Pipeline Flow:
 2. Active Status Check (if selected)
 3. Last Login Check (if selected)
 4. BluPages Validation (if selected)
+5. Cloud Last Login Check (if selected) - FINAL STAGE
 
 Each step uses the output from the previous step.
 """
@@ -23,6 +24,7 @@ from .isv_validator import validate_isv
 from .active_status_validator import validate_active_status
 from .login_validator import validate_last_login
 from .bluepages_validator import validate_bluepages
+from .cloud_login_validator import validate_cloud_login
 from .decision_engine import consolidate_decisions
 
 
@@ -51,7 +53,8 @@ async def run_validation_pipeline(
                 "isv_validation": True/False,
                 "active_status": True/False,
                 "last_login": True/False,
-                "bluepages": True/False
+                "bluepages": True/False,
+                "cloud_login": True/False
             }
         days_threshold: Days threshold for login check (default: 1065 = ~3 years)
         max_concurrent: Maximum concurrent requests for async operations
@@ -101,7 +104,8 @@ async def run_validation_pipeline(
                 "isv_validation": True,
                 "active_status": True,
                 "last_login": True,
-                "bluepages": True
+                "bluepages": True,
+                "cloud_login": True
             }
         
         # Validate input file - return error dict instead of raising exception
@@ -155,7 +159,7 @@ async def run_validation_pipeline(
         
         # Step 1: ISV Validation
         if checks.get("isv_validation", False):
-            print(f"[1/4] Running ISV Validation...")
+            print(f"[1/5] Running ISV Validation...")
             if status_callback:
                 status_callback("ISV Validation", "running")
             result = await validate_isv(
@@ -179,7 +183,7 @@ async def run_validation_pipeline(
         
         # Step 2: Active Status Check
         if checks.get("active_status", False):
-            print(f"[2/4] Running Active Status Check...")
+            print(f"[2/5] Running Active Status Check...")
             if status_callback:
                 status_callback("Dormancy Check", "running")
             result = validate_active_status(
@@ -202,7 +206,7 @@ async def run_validation_pipeline(
         
         # Step 3: Last Login Check
         if checks.get("last_login", False):
-            print(f"[3/4] Running Last Login Check...")
+            print(f"[3/5] Running Last Login Check...")
             if status_callback:
                 status_callback("Last Login Check", "running")
             result = validate_last_login(
@@ -227,7 +231,7 @@ async def run_validation_pipeline(
         
         # Step 4: BluPages Validation
         if checks.get("bluepages", False):
-            print(f"[4/4] Filtering IBM emails and running BluPages Validation...")
+            print(f"[4/5] Filtering IBM emails and running BluPages Validation...")
             if status_callback:
                 status_callback("BluPages Validation", "running")
             
@@ -327,6 +331,73 @@ async def run_validation_pipeline(
                 summary["not_to_delete"] = summary.get("recent_login", 0)
                 
                 checks_run.append("bluepages")
+            
+            print()
+        
+        # Step 5: Cloud Last Login Check (FINAL STAGE)
+        # Default threshold for cloud login is 3 years (1095 days)
+        cloud_threshold = 1095  # 3 years - hardcoded as per requirements
+        
+        if checks.get("cloud_login", False):
+            print(f"[5/5] Running Cloud Last Login Check (Final Stage)...")
+            print(f"  Cloud Login Threshold: {cloud_threshold} days (3 years - fixed)")
+            if status_callback:
+                status_callback("Cloud Login Check", "running")
+            
+            # Determine input file for cloud login check
+            # Priority: BluPages to_delete > Last Login old_login > Active users > Original extraction
+            cloud_input_file = None
+            
+            if "bluepages" in results:
+                # Use to_be_deleted from BluPages (preferred)
+                cloud_input_file = results["bluepages"].get("files_created", {}).get("to_delete")
+                print(f"  Using BluPages to_delete as input")
+            elif "last_login" in results:
+                # Use old_login from Last Login check
+                cloud_input_file = results["last_login"].get("files_created", {}).get("old_login")
+                print(f"  Using Last Login old_login as input")
+            elif "active_status" in results:
+                # Use active users from Active Status check
+                cloud_input_file = results["active_status"].get("files_created", {}).get("active")
+                print(f"  Using Active Status active users as input")
+            elif "isv_validation" in results:
+                # Use resolved users from ISV validation
+                cloud_input_file = results["isv_validation"].get("files_created", {}).get("resolved")
+                print(f"  Using ISV resolved users as input")
+            else:
+                # Use original extraction file as fallback
+                cloud_input_file = input_file
+                print(f"  Using original extraction file as input")
+            
+            if cloud_input_file and Path(cloud_input_file).exists():
+                print(f"  Input: {cloud_input_file}")
+                result = await validate_cloud_login(
+                    input_file=cloud_input_file,
+                    days_threshold=cloud_threshold,  # Use fixed 3-year threshold
+                    output_dir=output_dir,
+                    timestamp=timestamp,
+                    batch_size=50,  # Fixed batch size as per requirements
+                    max_concurrent=max_concurrent
+                )
+                results["cloud_login"] = result
+                checks_run.append("cloud_login")
+                
+                # Update summary with cloud login results
+                summary["cloud_exceeds_threshold"] = result.get("output", {}).get("exceeds_threshold", 0)
+                summary["cloud_recent_activity"] = result.get("output", {}).get("recent_activity", 0)
+                summary["cloud_missing_data"] = result.get("output", {}).get("missing_data", 0)
+                
+                # Update final counts
+                summary["to_delete"] = summary["cloud_exceeds_threshold"]
+                summary["not_to_delete"] = summary.get("found_in_bluepages", 0) + summary.get("recent_login", 0) + summary["cloud_recent_activity"]
+                
+                print(f"✓ Cloud Login Check complete: {summary['cloud_exceeds_threshold']} exceed threshold, {summary['cloud_recent_activity']} recent activity")
+                if status_callback:
+                    status_callback("Cloud Login Check", "completed")
+            else:
+                print(f"✓ No users to validate via Cloud Login Check (no input file available)")
+                if status_callback:
+                    status_callback("Cloud Login Check", "completed")
             
             print()
         

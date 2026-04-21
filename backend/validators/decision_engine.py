@@ -3,12 +3,13 @@ Dormant ID Decision Engine
 
 This module consolidates all validation results into a single unified JSON output
 with four categories:
-- to_be_deleted: Users who failed BluPages validation (not found in BluPages)
-- not_to_be_deleted: Users who passed all checks or have recent login
+- to_be_deleted: Users who failed all validations (including Cloud login check)
+- not_to_be_deleted: Users who passed all checks or have recent login/cloud activity
 - isv_inactive: Users who are inactive in ISV
 - isv_failed: Users who were not found in ISV
 
 Each user entry includes the reason mentioning the FINAL step where the decision was made.
+Cloud Last Login Check is the FINAL validation stage after BluPages.
 """
 
 import json
@@ -117,8 +118,76 @@ def consolidate_decisions(
                         })
                         processed_ids.add(user_id)
         
-        # Process BluPages results (final decision for active users with old login)
-        if "bluepages" in pipeline_results.get("results", {}):
+        # Process Cloud Login results (FINAL STAGE - takes precedence over BluPages)
+        # Cloud login uses fixed 3-year threshold (1095 days)
+        cloud_threshold_days = 1095
+        cloud_threshold_years = 3.0
+        
+        if "cloud_login" in pipeline_results.get("results", {}):
+            cloud_result = pipeline_results["results"]["cloud_login"]
+            
+            # Users who exceed cloud login threshold → to_be_deleted (FINAL)
+            to_delete_file = cloud_result.get("files_created", {}).get("to_delete")
+            if to_delete_file and Path(to_delete_file).exists():
+                with open(to_delete_file, 'r') as f:
+                    to_delete_users = json.load(f)
+                
+                for user in to_delete_users:
+                    user_id = user.get("user_id", user.get("id", ""))
+                    if user_id not in processed_ids:
+                        cloud_reason = user.get("cloud_login_reason", "Cloud last login exceeds threshold")
+                        reasons = []
+                        
+                        # Add Cloudant login status if old
+                        if threshold_days and threshold_days > 0:
+                            reasons.append(f"User has old Cloudant login (>{threshold_days} days / {threshold_years} years - user-defined)")
+                        
+                        # Add BluPages status if available
+                        if user.get("bluepages_status"):
+                            reasons.append(f"BluPages: {user.get('bluepages_status')}")
+                        
+                        # Add cloud login reason as FINAL decision with fixed threshold
+                        reasons.append(f"{cloud_reason} (Cloud threshold: {cloud_threshold_days} days / {cloud_threshold_years} years - fixed) - FINAL DECISION: Cloud Login Check Failed")
+                        
+                        decisions["to_be_deleted"].append({
+                            "id": user_id,
+                            "username": user.get("username", user.get("email", user_id)),
+                            "lastLogin": user.get("lastLogin"),
+                            "cloudLastLogin": user.get("cloud_last_login"),
+                            "activeStatus": user.get("active", True),
+                            "reasons": reasons
+                        })
+                        processed_ids.add(user_id)
+            
+            # Users with recent cloud activity → not_to_be_deleted (FINAL)
+            not_delete_file = cloud_result.get("files_created", {}).get("not_to_delete")
+            if not_delete_file and Path(not_delete_file).exists():
+                with open(not_delete_file, 'r') as f:
+                    not_delete_users = json.load(f)
+                
+                for user in not_delete_users:
+                    user_id = user.get("user_id", user.get("id", ""))
+                    if user_id not in processed_ids:
+                        cloud_reason = user.get("cloud_login_reason", "Recent activity found in Cloud")
+                        cloud_days = user.get("cloud_days_since_login", "unknown")
+                        
+                        reasons = [
+                            f"{cloud_reason} (Cloud threshold: {cloud_threshold_days} days / {cloud_threshold_years} years - fixed)",
+                            f"FINAL DECISION: Cloud Login Check Passed (cloud activity: {cloud_days} days)"
+                        ]
+                        
+                        decisions["not_to_be_deleted"].append({
+                            "id": user_id,
+                            "username": user.get("username", user.get("email", user_id)),
+                            "lastLogin": user.get("lastLogin"),
+                            "cloudLastLogin": user.get("cloud_last_login"),
+                            "activeStatus": user.get("active", True),
+                            "reasons": reasons
+                        })
+                        processed_ids.add(user_id)
+        
+        # Process BluPages results (if Cloud Login not run)
+        elif "bluepages" in pipeline_results.get("results", {}):
             bluepages_result = pipeline_results["results"]["bluepages"]
             
             # Process non-IBM users first (skipped BluPages validation)

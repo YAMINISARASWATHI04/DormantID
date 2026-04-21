@@ -1946,6 +1946,74 @@ async def validate_bluepages_endpoint():
         return jsonify({'error': f'Unexpected error: {str(e)}'}), 500
 
 
+@app.route('/api/validate/cloud-login', methods=['POST'])
+async def validate_cloud_login_endpoint():
+    """
+    Validate users against IBM Cloud IAM last login (Step 5 - Final Stage).
+    
+    This is the final validation step that checks user activity in IBM Cloud.
+    Uses fixed 3-year (1095 days) threshold.
+    
+    Request body:
+    {
+        "input_file": "backend/outputs/to_be_deleted_*.json",
+        "output_dir": "backend/outputs",
+        "timestamp": "20260421_100000",
+        "batch_size": 50,
+        "max_concurrent": 5
+    }
+    
+    Response:
+    {
+        "success": true,
+        "validator": "cloud_login",
+        "input_count": 100,
+        "output": {
+            "exceeds_threshold": 80,
+            "recent_activity": 20,
+            "missing_data": 5
+        },
+        "files_created": {
+            "to_delete": "path/to/to_be_deleted.json",
+            "not_to_delete": "path/to/not_to_be_deleted.json"
+        },
+        "threshold_days": 1095,
+        "timestamp": "2026-04-21T10:00:00",
+        "duration_seconds": 45
+    }
+    """
+    try:
+        data = request.get_json()
+        input_file = data.get('input_file')
+        output_dir = data.get('output_dir', 'backend/outputs')
+        timestamp = data.get('timestamp')
+        batch_size = data.get('batch_size', 50)  # Fixed at 50 as per requirements
+        max_concurrent = data.get('max_concurrent', 5)
+        
+        if not input_file:
+            return jsonify({'error': 'input_file is required'}), 400
+        
+        # Cloud Login uses fixed 3-year threshold (1095 days)
+        days_threshold = 1095
+        
+        # Call the cloud login validator
+        result = await validators.validate_cloud_login(
+            input_file=input_file,
+            days_threshold=days_threshold,
+            output_dir=output_dir,
+            timestamp=timestamp,
+            batch_size=batch_size,
+            max_concurrent=max_concurrent
+        )
+        
+        return jsonify(result)
+        
+    except validators.CloudLoginError as e:
+        return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        return jsonify({'error': f'Unexpected error: {str(e)}'}), 500
+
+
 @app.route('/api/validate/pipeline', methods=['POST'])
 @swag_from(swagger_specs.validate_pipeline_spec)
 async def validate_pipeline_endpoint():
