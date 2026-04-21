@@ -155,12 +155,13 @@ async def run_validation_pipeline(
             results["isv_validation"] = result
             checks_run.append("isv_validation")
             
-            summary["found_in_isv"] = result["output"]["found_in_isv"]
-            summary["not_found_in_isv"] = result["output"]["not_found_in_isv"]
+            # Safely extract output values with defaults
+            summary["found_in_isv"] = result.get("output", {}).get("found_in_isv", 0)
+            summary["not_found_in_isv"] = result.get("output", {}).get("not_found_in_isv", 0)
             
             # Use resolved file for next step
-            current_file = result["files_created"]["resolved"]
-            print(f"✓ ISV Validation complete: {result['output']['found_in_isv']} found, {result['output']['not_found_in_isv']} not found\n")
+            current_file = result.get("files_created", {}).get("resolved", current_file)
+            print(f"✓ ISV Validation complete: {summary['found_in_isv']} found, {summary['not_found_in_isv']} not found\n")
             if status_callback:
                 status_callback("ISV Validation", "completed")
         
@@ -177,12 +178,13 @@ async def run_validation_pipeline(
             results["active_status"] = result
             checks_run.append("active_status")
             
-            summary["active"] = result["output"]["active"]
-            summary["inactive"] = result["output"]["inactive"]
+            # Safely extract output values with defaults
+            summary["active"] = result.get("output", {}).get("active", 0)
+            summary["inactive"] = result.get("output", {}).get("inactive", 0)
             
             # Use active file for next step
-            current_file = result["files_created"]["active"]
-            print(f"✓ Active Status Check complete: {result['output']['active']} active, {result['output']['inactive']} inactive\n")
+            current_file = result.get("files_created", {}).get("active", current_file)
+            print(f"✓ Active Status Check complete: {summary['active']} active, {summary['inactive']} inactive\n")
             if status_callback:
                 status_callback("Dormancy Check", "completed")
         
@@ -201,12 +203,13 @@ async def run_validation_pipeline(
             results["last_login"] = result
             checks_run.append("last_login")
             
-            summary["old_login"] = result["output"]["old_login"]
-            summary["recent_login"] = result["output"]["recent_login"]
+            # Safely extract output values with defaults
+            summary["old_login"] = result.get("output", {}).get("old_login", 0)
+            summary["recent_login"] = result.get("output", {}).get("recent_login", 0)
             
             # Use old login file for BluPages check
-            current_file = result["files_created"]["old_login"]
-            print(f"✓ Last Login Check complete: {result['output']['old_login']} old (>{days_threshold} days), {result['output']['recent_login']} recent\n")
+            current_file = result.get("files_created", {}).get("old_login", current_file)
+            print(f"✓ Last Login Check complete: {summary['old_login']} old (>{days_threshold} days), {summary['recent_login']} recent\n")
             if status_callback:
                 status_callback("Last Login Check", "completed")
         
@@ -260,15 +263,16 @@ async def run_validation_pipeline(
                 
                 checks_run.append("bluepages")
                 
-                summary["found_in_bluepages"] = result["output"]["found_in_bluepages"]
-                summary["not_found_in_bluepages"] = result["output"]["not_found_in_bluepages"]
+                # Safely extract output values with defaults
+                summary["found_in_bluepages"] = result.get("output", {}).get("found_in_bluepages", 0)
+                summary["not_found_in_bluepages"] = result.get("output", {}).get("not_found_in_bluepages", 0)
                 summary["non_ibm_emails"] = len(non_ibm_users)
                 # Non-IBM users + users not found in BluPages = to_delete
-                summary["to_delete"] = result["output"]["not_found_in_bluepages"] + len(non_ibm_users)
+                summary["to_delete"] = summary["not_found_in_bluepages"] + len(non_ibm_users)
                 # Users found in BluPages + recent login users = not_to_delete
-                summary["not_to_delete"] = result["output"]["found_in_bluepages"] + summary.get("recent_login", 0)
+                summary["not_to_delete"] = summary["found_in_bluepages"] + summary.get("recent_login", 0)
                 
-                print(f"✓ BluPages Validation complete: {result['output']['found_in_bluepages']} found, {result['output']['not_found_in_bluepages']} not found")
+                print(f"✓ BluPages Validation complete: {summary['found_in_bluepages']} found, {summary['not_found_in_bluepages']} not found")
                 print(f"  Non-IBM emails (skipped BluPages): {len(non_ibm_users)}")
                 if status_callback:
                     status_callback("BluPages Validation", "completed")
@@ -323,20 +327,24 @@ async def run_validation_pipeline(
         end_time = datetime.now()
         duration = (end_time - start_time).total_seconds()
         
-        # Collect final output files
+        # Collect final output files (safely)
         final_outputs = {}
         if "bluepages" in results:
-            final_outputs["to_delete"] = results["bluepages"]["files_created"]["to_delete"]
-            final_outputs["not_to_delete"] = results["bluepages"]["files_created"]["not_to_delete"]
+            if "files_created" in results["bluepages"]:
+                final_outputs["to_delete"] = results["bluepages"]["files_created"].get("to_delete")
+                final_outputs["not_to_delete"] = results["bluepages"]["files_created"].get("not_to_delete")
         elif "last_login" in results:
-            final_outputs["old_login"] = results["last_login"]["files_created"]["old_login"]
-            final_outputs["recent_login"] = results["last_login"]["files_created"]["recent_login"]
+            if "files_created" in results["last_login"]:
+                final_outputs["old_login"] = results["last_login"]["files_created"].get("old_login")
+                final_outputs["recent_login"] = results["last_login"]["files_created"].get("recent_login")
         
         if "active_status" in results:
-            final_outputs["inactive"] = results["active_status"]["files_created"]["inactive"]
+            if "files_created" in results["active_status"]:
+                final_outputs["inactive"] = results["active_status"]["files_created"].get("inactive")
         
         if "isv_validation" in results:
-            final_outputs["failed_isv"] = results["isv_validation"]["files_created"]["failed"]
+            if "files_created" in results["isv_validation"]:
+                final_outputs["failed_isv"] = results["isv_validation"]["files_created"].get("failed")
         
         print(f"{'='*70}")
         print(f"PIPELINE COMPLETE")
