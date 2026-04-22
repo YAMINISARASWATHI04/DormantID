@@ -268,34 +268,29 @@ async def run_validation_pipeline(
                     user['skip_reason'] = 'Non-IBM Email Domain - Will check Cloud activity'
             
             # Run BluPages validation only on IBM users - pass data directly
+            # Use return_cloud_candidates=True to get in-memory data instead of creating to_be_deleted file
             if ibm_users:
                 result = await validate_bluepages(
                     users_data=ibm_users,
                     output_dir=output_dir,
                     timestamp=timestamp,
                     max_concurrent=max_concurrent,
-                    batch_size=batch_size
+                    batch_size=batch_size,
+                    return_cloud_candidates=True  # Return in-memory data for Cloud Check
                 )
                 results["bluepages"] = result
                 
+                # Get cloud check candidates from in-memory data
+                cloud_check_candidates = result.get("data", {}).get("cloud_check_candidates", [])
+                
                 # Merge non-IBM users with BluPages not_found users for Cloud Check
-                # Both groups will go to Cloud Check in Step 5
+                # Both groups will go to Cloud Check in Step 5 (in-memory)
                 if non_ibm_users:
-                    # Save non-IBM users to to_be_deleted file (will be input for Cloud Check)
-                    to_delete_file = result.get("files_created", {}).get("to_delete")
-                    if to_delete_file and Path(to_delete_file).exists():
-                        # Read existing to_delete users (not found in BluPages)
-                        with open(to_delete_file, 'r') as f:
-                            to_delete_users = json.load(f)
-                        
-                        # Add non-IBM users to the list
-                        to_delete_users.extend(non_ibm_users)
-                        
-                        # Write back combined list
-                        with open(to_delete_file, 'w') as f:
-                            json.dump(to_delete_users, f, indent=2)
-                        
-                        print(f"  Added {len(non_ibm_users)} non-IBM users to Cloud Check input")
+                    cloud_check_candidates.extend(non_ibm_users)
+                    print(f"  Added {len(non_ibm_users)} non-IBM users to Cloud Check candidates")
+                
+                # Store cloud check candidates for Step 5
+                results["bluepages"]["cloud_check_candidates"] = cloud_check_candidates
                 
                 checks_run.append("bluepages")
                 
@@ -319,16 +314,15 @@ async def run_validation_pipeline(
                 # Use the provided output_dir parameter
                 outputs_dir = Path(output_dir)
                 outputs_dir.mkdir(parents=True, exist_ok=True)
-                to_delete_file = outputs_dir / f"to_be_deleted_{timestamp}.json"
                 
-                # Save non-IBM users to to_delete file (will be input for Cloud Check)
+                # Store cloud check candidates (only non-IBM users in this case)
+                cloud_check_candidates = non_ibm_users if non_ibm_users else []
+                
                 if non_ibm_users:
-                    with open(to_delete_file, 'w') as f:
-                        json.dump(non_ibm_users, f, indent=2)
                     print(f"  Non-IBM emails (will check Cloud): {len(non_ibm_users)}")
                     print(f"  Total users for Cloud Check: {len(non_ibm_users)}")
                 
-                # Store result for final outputs
+                # Store result for final outputs (no files created yet)
                 results["bluepages"] = {
                     "success": True,
                     "validator": "bluepages",
@@ -338,9 +332,9 @@ async def run_validation_pipeline(
                         "not_found_in_bluepages": 0
                     },
                     "files_created": {
-                        "to_delete": str(to_delete_file),
                         "not_to_delete": str(outputs_dir / "not_to_be_deleted.json")
-                    }
+                    },
+                    "cloud_check_candidates": cloud_check_candidates
                 }
                 
                 summary["non_ibm_emails"] = len(non_ibm_users)
@@ -365,35 +359,42 @@ async def run_validation_pipeline(
             if status_callback:
                 status_callback("Cloud Validation", "running")
             
-            # Determine input file for cloud login check
-            # Priority: BluPages to_delete > Last Login old_login > Active users > Original extraction
+            # Get cloud check candidates from BluPages (in-memory)
+            # Priority: BluPages cloud_check_candidates > Last Login old_login file > fallback to file-based
+            cloud_check_users = None
             cloud_input_file = None
             
-            if "bluepages" in results:
-                # Use to_be_deleted from BluPages (preferred)
-                cloud_input_file = results["bluepages"].get("files_created", {}).get("to_delete")
-                print(f"  Using BluPages to_delete as input")
+            if "bluepages" in results and "cloud_check_candidates" in results["bluepages"]:
+                # Use in-memory cloud check candidates from BluPages (preferred)
+                cloud_check_users = results["bluepages"]["cloud_check_candidates"]
+                print(f"  Using in-memory cloud check candidates from BluPages")
+                print(f"  Total candidates: {len(cloud_check_users)}")
             elif "last_login" in results:
-                # Use old_login from Last Login check
+                # Fallback: Use old_login file from Last Login check
                 cloud_input_file = results["last_login"].get("files_created", {}).get("old_login")
-                print(f"  Using Last Login old_login as input")
+                if cloud_input_file and Path(cloud_input_file).exists():
+                    print(f"  Using Last Login old_login file as input: {cloud_input_file}")
             elif "active_status" in results:
-                # Use active users from Active Status check
+                # Fallback: Use active users file from Active Status check
                 cloud_input_file = results["active_status"].get("files_created", {}).get("active")
-                print(f"  Using Active Status active users as input")
+                if cloud_input_file and Path(cloud_input_file).exists():
+                    print(f"  Using Active Status active users file as input: {cloud_input_file}")
             elif "isv_validation" in results:
-                # Use resolved users from ISV validation
+                # Fallback: Use resolved users file from ISV validation
                 cloud_input_file = results["isv_validation"].get("files_created", {}).get("resolved")
-                print(f"  Using ISV resolved users as input")
+                if cloud_input_file and Path(cloud_input_file).exists():
+                    print(f"  Using ISV resolved users file as input: {cloud_input_file}")
             else:
-                # Use original extraction file as fallback
+                # Fallback: Use original extraction file
                 cloud_input_file = input_file
-                print(f"  Using original extraction file as input")
+                if cloud_input_file and Path(cloud_input_file).exists():
+                    print(f"  Using original extraction file as input: {cloud_input_file}")
             
-            if cloud_input_file and Path(cloud_input_file).exists():
-                print(f"  Input: {cloud_input_file}")
+            # Run Cloud Check with in-memory data or file
+            if cloud_check_users is not None:
+                # Use in-memory data (preferred)
                 result = await validate_cloud_login(
-                    input_file=cloud_input_file,
+                    users_data=cloud_check_users,  # Pass in-memory data
                     days_threshold=days_threshold,  # Use dynamic threshold from UI
                     output_dir=output_dir,
                     timestamp=timestamp,
@@ -415,8 +416,31 @@ async def run_validation_pipeline(
                 print(f"✓ Cloud Login Check complete: {summary['cloud_exceeds_threshold']} exceed threshold, {summary['cloud_recent_activity']} recent activity")
                 if status_callback:
                     status_callback("Cloud Validation", "completed")
+            elif 'cloud_input_file' in locals() and cloud_input_file and Path(cloud_input_file).exists():
+                # Fallback to file-based input
+                result = await validate_cloud_login(
+                    input_file=cloud_input_file,
+                    days_threshold=days_threshold,
+                    output_dir=output_dir,
+                    timestamp=timestamp,
+                    batch_size=50,
+                    max_concurrent=max_concurrent
+                )
+                results["cloud_login"] = result
+                checks_run.append("cloud_login")
+                
+                # Update summary
+                summary["cloud_exceeds_threshold"] = result.get("output", {}).get("exceeds_threshold", 0)
+                summary["cloud_recent_activity"] = result.get("output", {}).get("recent_activity", 0)
+                summary["cloud_missing_data"] = result.get("output", {}).get("missing_data", 0)
+                summary["to_delete"] = summary["cloud_exceeds_threshold"]
+                summary["not_to_delete"] = summary.get("found_in_bluepages", 0) + summary.get("recent_login", 0) + summary["cloud_recent_activity"]
+                
+                print(f"✓ Cloud Login Check complete: {summary['cloud_exceeds_threshold']} exceed threshold, {summary['cloud_recent_activity']} recent activity")
+                if status_callback:
+                    status_callback("Cloud Validation", "completed")
             else:
-                print(f"✓ No users to validate via Cloud Login Check (no input file available)")
+                print(f"✓ No users to validate via Cloud Login Check (no input data available)")
                 if status_callback:
                     status_callback("Cloud Validation", "completed")
             

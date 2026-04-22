@@ -1,0 +1,242 @@
+[
+  {
+    "id": "20260423_011301",
+    "start_date": null,
+    "end_date": null,
+    "records_processed": 4,
+    "months_processed": 0,
+    "status": "completed",
+    "error": null,
+    "timestamp": "2026-04-23T01:13:01.266004",
+    "duration_seconds": 0,
+    "filename": "extraction_20260423_011300.json",
+    "output_file": "dormant_id_decisions_20260423_011300.json",
+    "filters": {
+      "isv_validation": true,
+      "dormancy_check": true,
+      "federated_id_removal": true,
+      "cloud_activity_validation": true
+    },
+    "extraction_mode": "specific_ids"
+  },
+  {
+    "id": "20260423_011033",
+    "start_date": "2019-04-13 00:00:00",
+    "end_date": "2019-04-13 23:59:00",
+    "records_processed": 118,
+    "months_processed": 1,
+    "status": "completed",
+    "error": null,
+    "timestamp": "2026-04-23T01:10:33.361219",
+    "duration_seconds": 5,
+    "filename": "extraction_20260423_011027.json",
+    "output_file": "dormant_id_decisions_20260423_011029.json",
+    "filters": {
+      "isv_validation": true,
+      "dormancy_check": true,
+      "federated_id_removal": true,
+      "cloud_activity_validation": true
+    },
+    "extraction_mode": "date_range"
+  },
+  {
+    "id": "20260423_011002",
+    "start_date": null,
+    "end_date": null,
+    "records_processed": 1,
+    "months_processed": 0,
+    "status": "completed",
+    "error": null,
+    "timestamp": "2026-04-23T01:10:02.984071",
+    "duration_seconds": 1,
+    "filename": "extraction_20260423_011001.json",
+    "output_file": "dormant_id_decisions_20260423_011001.json",
+    "filters": {
+      "isv_validation": true,
+      "dormancy_check": true,
+      "federated_id_removal": true,
+      "cloud_activity_validation": true
+    },
+    "extraction_mode": "specific_ids"
+  },
+  {
+    "id": "20260423_010857",
+    "start_date": null,
+    "end_date": null,
+    "records_processed": 1,
+    "months_processed": 0,
+    "status": "completed",
+    "error": null,
+    "timestamp": "2026-04-23T01:08:57.995549",
+    "duration_seconds": 1,
+    "filename": "extraction_20260423_010856.json",
+    "output_file": "dormant_id_decisions_20260423_010856.json",
+    "filters": {
+      "isv_validation": true,
+      "dormancy_check": true,
+      "federated_id_removal": true,
+      "cloud_activity_validation": true
+    },
+    "extraction_mode": "specific_ids"
+  },
+  {
+    "id": "20260423_010108",
+    "start_date": null,
+    "end_date": null,
+    "records_processed": 1,
+    "months_processed": 0,
+    "status": "completed",
+    "error": null,
+    "timestamp": "2026-04-23T01:01:08.016886",
+    "duration_seconds": 1,
+    "filename": "extraction_20260423_010106.json",
+    "output_file": "dormant_id_decisions_20260423_010106.json",
+    "filters": {
+      "isv_validation": true,
+      "dormancy_check": true,
+      "federated_id_removal": true,
+      "cloud_activity_validation": true
+    },
+    "extraction_mode": "specific_ids"
+  },
+  {
+    "id": "20260423_004059",
+    "start_date": "2019-04-13 00:00:00",
+    "end_date": "2019-04-13 23:59:00",
+    "records_processed": 118,
+    "months_processed": 1,
+    "status": "completed",
+    "error": null,
+    "timestamp": "2026-04-23T00:40:59.452372",
+    "duration_seconds": 5,
+    "filename": "extraction_20260423_004053.json",
+    "output_file": "dormant_id_decisions_20260423_004056.json",
+    "filters": {
+      "isv_validation": true,
+      "dormancy_check": true,
+      "federated_id_removal": true,
+      "cloud_activity_validation": true
+    },
+    "extraction_mode": "date_range"
+  },
+  {
+    "id": "20260423_004020",
+    "start_date": null,
+    "end_date": null,
+    "records_processed": 1,
+    "months_processed": 0,
+    "status": "completed",
+    "error": null,
+    "timestamp": "2026-04-23T00:40:20.015686",
+    "duration_seconds": 1,
+    "filename": "extraction_20260423_004018.json",
+    "output_file": "dormant_id_decisions_20260423_004018.json",
+    "filters": {
+      "isv_validation": true,
+      "dormancy_check": true,
+      "federated_id_removal": true,
+      "cloud_activity_validation": true
+    },
+    "extraction_mode": "specific_ids"
+  },
+  {
+    "id": "20260423_002919",
+    "start_date": null,
+    "end_date": null,
+    "records_processed": 1,
+    "months_processed": 0,
+    "status": "completed",
+    "error": null,
+    "timestamp": "2026-04-23T00:29:19.109645",
+    "duration_seconds": 1,
+    "filename": "extraction_20260423_002917.json",
+    "output_file": "dormant_id_decisions_20260423_002917.json",
+    "filters": {
+      "isv_validation": true,
+      "dormancy_check": true,
+      "federated_id_removal": true,
+      "cloud_activity_validation": true
+    },
+    "extraction_mode": "specific_ids"
+  },
+  {
+    "id": "20260423_002432",
+    "start_date": null,
+    "end_date": null,
+    "records_processed": 1,
+    "months_processed": 0,
+    "status": "completed",
+    "error": null,
+    "timestamp": "2026-04-23T00:24:32.643812",
+    "duration_seconds": 1,
+    "filename": "extraction_20260423_002431.json",
+    "output_file": "dormant_id_decisions_20260423_002431.json",
+    "filters": {
+      "isv_validation": true,
+      "dormancy_check": true,
+      "federated_id_removal": true,
+      "cloud_activity_validation": true
+    },
+    "extraction_mode": "specific_ids"
+  },
+  {
+    "id": "20260423_001903",
+    "start_date": null,
+    "end_date": null,
+    "records_processed": 1,
+    "months_processed": 0,
+    "status": "completed",
+    "error": null,
+    "timestamp": "2026-04-23T00:19:03.417899",
+    "duration_seconds": 1,
+    "filename": "extraction_20260423_001901.json",
+    "output_file": "dormant_id_decisions_20260423_001901.json",
+    "filters": {
+      "isv_validation": true,
+      "dormancy_check": true,
+      "federated_id_removal": true,
+      "cloud_activity_validation": true
+    },
+    "extraction_mode": "specific_ids"
+  },
+  {
+    "id": "20260423_001255",
+    "start_date": null,
+    "end_date": null,
+    "records_processed": 1,
+    "months_processed": 0,
+    "status": "completed",
+    "error": null,
+    "timestamp": "2026-04-23T00:12:55.988450",
+    "duration_seconds": 1,
+    "filename": "extraction_20260423_001254.json",
+    "output_file": "dormant_id_decisions_20260423_001254.json",
+    "filters": {
+      "isv_validation": true,
+      "dormancy_check": true,
+      "federated_id_removal": true,
+      "cloud_activity_validation": true
+    },
+    "extraction_mode": "specific_ids"
+  },
+  {
+    "id": "20260423_000458",
+    "start_date": null,
+    "end_date": null,
+    "records_processed": 1,
+    "months_processed": 0,
+    "status": "completed",
+    "error": null,
+    "timestamp": "2026-04-23T00:04:58.206291",
+    "duration_seconds": 1,
+    "filename": "extraction_20260423_000456.json",
+    "output_file": "dormant_id_decisions_20260423_000456.json",
+    "filters": {
+      "isv_validation": true,
+      "dormancy_check": true,
+      "federated_id_removal": true,
+      "cloud_activity_validation": true
+    },
+    "extraction_mode": "specific_ids"
+  }
+]

@@ -1,70 +1,10 @@
 {
-  "processed_count": 13,
-  "timestamp": "2026-04-22T15:21:03.691095",
+  "processed_count": 1,
+  "timestamp": "2026-04-23T00:03:48.436480",
   "results": {
-    "550006DQCB": {
-      "email": "elidaufpb@gmail.com",
-      "lastLogin": "2021-09-30T23:50:19Z",
-      "active": true
-    },
-    "550006DQN2": {
-      "email": "fernablanco.alison@gmail.com",
-      "lastLogin": "2021-04-30T22:34:12Z",
-      "active": true
-    },
-    "550006DQP9": {
-      "email": "Michealoladeji@gmail.com",
-      "lastLogin": "2021-09-15T08:25:18Z",
-      "active": true
-    },
-    "550006DQN4": {
-      "email": "hallderm3@gmail.com",
-      "lastLogin": "2021-04-05T02:10:34Z",
-      "active": true
-    },
-    "550006DQBC": {
-      "email": "angelo_g96@hotmail.com",
-      "lastLogin": "2021-09-26T01:26:30Z",
-      "active": true
-    },
-    "550006DQEY": {
-      "email": "1@m.mzr.me",
-      "lastLogin": null,
-      "active": true
-    },
-    "550006DQCY": {
-      "email": "kifahharb@hotmail.com",
-      "lastLogin": "2021-11-11T02:34:19Z",
-      "active": true
-    },
-    "550006DQPX": {
-      "email": "u201612829@upc.edu.pe",
-      "lastLogin": "2021-10-16T23:51:24Z",
-      "active": true
-    },
-    "550006DQR8": {
-      "email": "vnoc@pm.me",
-      "lastLogin": null,
-      "active": true
-    },
-    "550006DQSE": {
-      "email": "ITISUMAIRO@GMAIL.COM",
-      "lastLogin": null,
-      "active": true
-    },
-    "550006DQBX": {
-      "email": "rcunha@equinix.com",
-      "lastLogin": "2021-05-19T19:21:28Z",
-      "active": true
-    },
-    "550006DQJK": {
-      "email": "jepark@cplatform.co.kr",
-      "lastLogin": "2021-06-25T03:05:10Z",
-      "active": true
-    },
-    "550006DQHE": {
-      "email": "nadyagalo@ufg.br",
-      "lastLogin": "2021-07-23T19:53:34Z",
+    "550002VDMW": {
+      "email": "kliunj@yahoo.com",
+      "lastLogin": "2022-07-20T04:23:15Z",
       "active": true
     }
   }

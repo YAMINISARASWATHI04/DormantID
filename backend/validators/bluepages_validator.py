@@ -38,7 +38,8 @@ async def validate_bluepages(
     timestamp: Optional[str] = None,
     max_concurrent: int = 50,
     batch_size: int = 100,
-    skip_file_creation: bool = False
+    skip_file_creation: bool = False,
+    return_cloud_candidates: bool = False
 ) -> Dict:
     """
     Validate users against IBM BluPages.
@@ -54,6 +55,7 @@ async def validate_bluepages(
         max_concurrent: Maximum concurrent API requests
         batch_size: Number of users to process per batch
         skip_file_creation: If True, return data in-memory without creating files
+        return_cloud_candidates: If True, return cloud check candidates in-memory instead of creating to_be_deleted file
         
     Returns:
         Dictionary with validation results:
@@ -174,7 +176,12 @@ async def validate_bluepages(
             }
         
         # Create output file paths - final outputs go to outputs folder
-        to_delete_file = outputs_dir / f"to_be_deleted_{timestamp}.json"
+        # Only create to_delete_file if not returning cloud candidates in-memory
+        if not return_cloud_candidates:
+            to_delete_file = outputs_dir / f"to_be_deleted_{timestamp}.json"
+        else:
+            to_delete_file = None
+        
         not_to_delete_file = outputs_dir / "not_to_be_deleted.json"
         
         # Use a temporary file for BluPages results
@@ -210,10 +217,17 @@ async def validate_bluepages(
         # Run BluPages validation using existing async validator only if not skipping
         if not skip_file_creation:
             try:
+                # Create a temporary to_delete file if returning cloud candidates
+                if return_cloud_candidates:
+                    temp_to_delete_file = Path(output_dir) / f"temp_to_delete_{timestamp}.json"
+                    to_delete_file_str = str(temp_to_delete_file)
+                else:
+                    to_delete_file_str = str(to_delete_file)
+                
                 await asyncio.wait_for(
                     validate_users_async(
                         input_file=input_file_to_use,
-                        to_delete_file=str(to_delete_file),
+                        to_delete_file=to_delete_file_str,
                         not_to_delete_file=str(temp_bluepages_file),  # Use temp file
                         test_mode=False,
                         resume=False,
@@ -338,7 +352,24 @@ async def validate_bluepages(
                     pass  # Ignore cleanup errors
             
             # Load to_delete results
-            if to_delete_file.exists():
+            if return_cloud_candidates:
+                # Read from temporary file
+                temp_to_delete_file = Path(output_dir) / f"temp_to_delete_{timestamp}.json"
+                if temp_to_delete_file.exists():
+                    try:
+                        with open(temp_to_delete_file, 'r') as f:
+                            to_delete_users = json.load(f)
+                        # Clean up temp file
+                        temp_to_delete_file.unlink()
+                    except Exception as e:
+                        return {
+                            "success": False,
+                            "error": "File read error",
+                            "message": f"Failed to read to_delete results: {str(e)}",
+                            "validator": "bluepages",
+                            "timestamp": datetime.now().isoformat()
+                        }
+            elif to_delete_file and to_delete_file.exists():
                 try:
                     with open(to_delete_file, 'r') as f:
                         to_delete_users = json.load(f)
@@ -369,18 +400,21 @@ async def validate_bluepages(
                 "not_found_in_bluepages": to_delete_count
             },
             "files_created": {
-                "to_delete": str(to_delete_file),
                 "not_to_delete": str(not_to_delete_file)
             },
             "timestamp": end_time.isoformat(),
             "duration_seconds": int(duration)
         }
         
-        # Add in-memory data if skipping file creation
-        if skip_file_creation:
+        # Add to_delete file path only if not returning cloud candidates
+        if not return_cloud_candidates and to_delete_file:
+            result["files_created"]["to_delete"] = str(to_delete_file)
+        
+        # Add in-memory data if skipping file creation or returning cloud candidates
+        if skip_file_creation or return_cloud_candidates:
             result["data"] = {
-                "to_delete_users": to_delete_users,
-                "not_to_delete_users": bluepages_users
+                "not_to_delete_users": bluepages_users,
+                "cloud_check_candidates": to_delete_users  # Users for Cloud Check
             }
         
         return result

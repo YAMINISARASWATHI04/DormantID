@@ -1,0 +1,33 @@
+{
+  "status": "finished",
+  "current_month": "2019-04",
+  "records_processed": 4,
+  "progress_percent": 100,
+  "start_date": "2019-04-13 00:00:00",
+  "end_date": "2019-04-13 23:59:00",
+  "total_months": 1,
+  "completed_months": 1,
+  "error": null,
+  "last_updated": "2026-04-23T01:13:01.265781",
+  "extraction_mode": "specific_ids",
+  "total_ids": 4,
+  "start_time": 1776886980.3443022,
+  "output_file": "dormant_id_decisions_20260423_011300.json",
+  "filters": {
+    "isv_validation": true,
+    "dormancy_check": true,
+    "federated_id_removal": true,
+    "cloud_activity_validation": true
+  },
+  "current_step": "Cloud Validation",
+  "validation_progress": {
+    "extraction": "completed",
+    "isv_validation": "completed",
+    "dormancy_check": "completed",
+    "last_login_check": "completed",
+    "bluepages_check": "completed",
+    "cloud_validation": "completed"
+  },
+  "validation_step_status": "completed",
+  "duration_seconds": 0
+}

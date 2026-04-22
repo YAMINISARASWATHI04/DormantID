@@ -144,8 +144,9 @@ def consolidate_decisions(
                         if user.get("bluepages_status"):
                             reasons.append(f"BluPages: {user.get('bluepages_status')}")
                         
-                        # Add cloud login reason as FINAL decision with user-defined threshold
-                        reasons.append(f"{cloud_reason} (Cloud threshold: {threshold_days} days / {threshold_years} years - user-defined) - FINAL DECISION: Cloud Login Check Failed")
+                        # Add cloud login reason as FINAL decision
+                        # The cloud_reason already contains the full message with threshold info
+                        reasons.append(f"FINAL DECISION: {cloud_reason}")
                         
                         decisions["to_be_deleted"].append({
                             "id": user_id,
@@ -170,8 +171,8 @@ def consolidate_decisions(
                         cloud_days = user.get("cloud_days_since_login", "unknown")
                         skip_cloud_check = user.get("skip_cloud_check", False)
                         
-                        # Check if user skipped Cloud Check due to missing lastLogin
-                        if skip_cloud_check or "NO IBM Cloud Check" in cloud_reason:
+                        # Check if user has no cloud data (Cloud Check Failed)
+                        if skip_cloud_check or "NO IBM Cloud Check" in cloud_reason or "Cloud Check Failed" in cloud_reason:
                             reasons = [
                                 f"User has old Cloudant login (>{threshold_days} days / {threshold_years} years - user-defined)",
                                 f"FINAL DECISION: {cloud_reason}"

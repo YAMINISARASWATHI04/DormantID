@@ -124,8 +124,9 @@ async def fetch_cloud_login_batch(
             result = await response.json()
             
             # Parse response and build mapping
+            # API returns data in "results" array
             login_data = {}
-            for item in result.get("identities", []):
+            for item in result.get("results", []):
                 iam_id = item.get("iam_id")
                 last_login = item.get("last_login")
                 if iam_id:
@@ -257,54 +258,40 @@ async def validate_cloud_login(
         # Create output directory
         Path(output_dir).mkdir(parents=True, exist_ok=True)
         
-        # First, validate lastLogin field for all users
-        # Users without valid lastLogin should skip Cloud Check
-        users_with_valid_login = []
-        users_without_valid_login = []
-        
         print(f"\n{'='*70}")
         print(f"CLOUD LOGIN VALIDATOR - Starting")
         print(f"{'='*70}")
         print(f"Total users: {input_count}")
-        print(f"Validating lastLogin field...")
+        print(f"Querying IBM Cloud IAM API for all users...")
         
-        for user in users:
-            last_login = user.get("lastLogin")
-            
-            # Check if lastLogin is valid (not null, not empty, not missing)
-            if last_login is None or last_login == "" or not isinstance(last_login, str):
-                # No valid lastLogin - skip Cloud Check
-                user["cloud_last_login"] = None
-                user["cloud_login_reason"] = "NO IBM Cloud Check - Missing/Invalid lastLogin in Cloudant"
-                user["skip_cloud_check"] = True
-                users_without_valid_login.append(user)
-            else:
-                # Valid lastLogin - proceed with Cloud Check
-                users_with_valid_login.append(user)
-        
-        print(f"✓ Users with valid lastLogin: {len(users_with_valid_login)}")
-        print(f"✓ Users without valid lastLogin (skip Cloud Check): {len(users_without_valid_login)}")
-        
-        # Extract IAM IDs only from users with valid lastLogin
+        # Extract IAM IDs from ALL users (no pre-validation of Cloudant lastLogin)
         iam_id_to_user = {}
-        for user in users_with_valid_login:
+        for user in users:
             # Try to extract IAM ID from user_id or email
             user_id = user.get("user_id", user.get("id", ""))
             email = user.get("email", user.get("username", ""))
+            
+            print(f"DEBUG: Extracting IAM ID for user:")
+            print(f"  user_id: {user_id}")
+            print(f"  email: {email}")
             
             # IAM ID format: IBMid-XXXXXXXXXX
             iam_id = None
             if user_id.startswith("IBMid-"):
                 iam_id = user_id
-            elif email and "@" in email:
-                # Try to construct IAM ID from email prefix
-                # This is a fallback - ideally we'd have the IAM ID directly
-                iam_id = user_id  # Use as-is for now
+                print(f"  Using user_id as IAM ID: {iam_id}")
+            elif user_id:
+                # Add IBMid- prefix if not present
+                iam_id = f"IBMid-{user_id}"
+                print(f"  Added IBMid- prefix: {iam_id}")
             
             if iam_id:
                 iam_id_to_user[iam_id] = user
+            else:
+                print(f"  No IAM ID found for user")
         
         print(f"Users with IAM IDs (for Cloud Check): {len(iam_id_to_user)}")
+        print(f"IAM IDs to query: {list(iam_id_to_user.keys())}")
         print(f"Threshold: {days_threshold} days (~{days_threshold/365:.1f} years)")
         print(f"Batch size: {batch_size}")
         print(f"{'='*70}\n")
@@ -352,55 +339,84 @@ async def validate_cloud_login(
         threshold_date = current_time - timedelta(days=days_threshold)
         
         # Categorize users based on cloud login
-        exceeds_threshold_users = []  # Keep in to_be_deleted
-        recent_activity_users = []     # Move to not_to_be_deleted
+        exceeds_threshold_users = []  # Keep in to_be_deleted (only if cloud data > threshold)
+        recent_activity_users = []     # Move to not_to_be_deleted (no data OR data ≤ threshold)
         missing_data_count = 0
         
         for iam_id, user in iam_id_to_user.items():
             cloud_last_login = all_login_data.get(iam_id)
             
+            # Debug logging
+            print(f"DEBUG: Processing user {iam_id}")
+            print(f"  Cloud API response: {cloud_last_login} (type: {type(cloud_last_login)})")
+            
             if cloud_last_login is None or cloud_last_login == "":
-                # No cloud login data - keep in to_be_deleted
+                # No cloud login data - move to not_to_be_deleted (expected for non-IBM emails)
                 user["cloud_last_login"] = None
-                user["cloud_login_reason"] = "No cloud activity found"
-                exceeds_threshold_users.append(user)
+                user["cloud_login_reason"] = "NO IBM Cloud Check - No cloud data found (expected for non-IBM emails)"
+                recent_activity_users.append(user)
                 missing_data_count += 1
+                print(f"  Decision: not_to_be_deleted (no cloud data)")
             else:
                 try:
-                    # Parse cloud last login date
-                    cloud_login_date = datetime.fromisoformat(cloud_last_login.replace('Z', '+00:00'))
+                    # Parse cloud last login date - handle both Unix timestamp (ms) and ISO string
+                    if isinstance(cloud_last_login, (int, float)):
+                        # Unix timestamp in milliseconds
+                        print(f"  Parsing as number: {cloud_last_login}")
+                        cloud_login_date = datetime.fromtimestamp(cloud_last_login / 1000, tz=timezone.utc)
+                    elif isinstance(cloud_last_login, str):
+                        # Try to parse as Unix timestamp first (if string contains only digits)
+                        if cloud_last_login.isdigit():
+                            # String representation of Unix timestamp
+                            print(f"  Parsing as string number: {cloud_last_login}")
+                            timestamp_ms = int(cloud_last_login)
+                            cloud_login_date = datetime.fromtimestamp(timestamp_ms / 1000, tz=timezone.utc)
+                        else:
+                            # ISO string format
+                            print(f"  Parsing as ISO string: {cloud_last_login}")
+                            cloud_login_date = datetime.fromisoformat(cloud_last_login.replace('Z', '+00:00'))
+                    else:
+                        raise ValueError(f"Unexpected cloud_last_login type: {type(cloud_last_login)}")
+                    
                     days_since_cloud_login = (current_time - cloud_login_date).days
                     
-                    user["cloud_last_login"] = cloud_last_login
+                    # Convert to ISO string for storage
+                    cloud_login_iso = cloud_login_date.isoformat()
+                    user["cloud_last_login"] = cloud_login_iso
                     user["cloud_days_since_login"] = days_since_cloud_login
+                    
+                    print(f"  Parsed date: {cloud_login_iso}")
+                    print(f"  Days since login: {days_since_cloud_login}")
+                    print(f"  Threshold: {days_threshold}")
                     
                     if days_since_cloud_login > days_threshold:
                         # Cloud login exceeds threshold - keep in to_be_deleted
                         user["cloud_login_reason"] = f"Cloud last login exceeds threshold ({days_since_cloud_login} days > {days_threshold} days)"
                         exceeds_threshold_users.append(user)
+                        print(f"  Decision: to_be_deleted (exceeds threshold)")
                     else:
                         # Recent cloud activity - move to not_to_be_deleted
                         user["cloud_login_reason"] = f"Recent activity found in Cloud ({days_since_cloud_login} days ≤ {days_threshold} days)"
                         recent_activity_users.append(user)
-                except (ValueError, AttributeError):
-                    # Unparseable date - keep in to_be_deleted
-                    user["cloud_last_login"] = cloud_last_login
-                    user["cloud_login_reason"] = "Invalid cloud login date format"
-                    exceeds_threshold_users.append(user)
+                        print(f"  Decision: not_to_be_deleted (recent activity)")
+                except (ValueError, AttributeError, TypeError) as e:
+                    # Unparseable date - move to not_to_be_deleted (benefit of doubt)
+                    print(f"  ERROR parsing: {str(e)}")
+                    user["cloud_last_login"] = str(cloud_last_login)
+                    user["cloud_login_reason"] = f"Invalid cloud login date format: {str(e)}"
+                    recent_activity_users.append(user)
                     missing_data_count += 1
+                    print(f"  Decision: not_to_be_deleted (parse error)")
         
-        # Add users without IAM IDs from valid login users to exceeds_threshold (keep in to_be_deleted)
-        for user in users_with_valid_login:
+        # Add users without Cloud API data to recent_activity_users (Cloud Check Failed)
+        # These are users who were not in iam_id_to_user (no Cloud API last login timestamp)
+        for user in users:
             user_id = user.get("user_id", user.get("id", ""))
             if user_id not in iam_id_to_user:
                 user["cloud_last_login"] = None
-                user["cloud_login_reason"] = "No IAM ID found for cloud check"
-                exceeds_threshold_users.append(user)
+                user["cloud_login_reason"] = "Cloud Check Failed (no last login timestamp)"
+                recent_activity_users.append(user)  # Move to not_to_be_deleted
                 missing_data_count += 1
-        
-        # Add users without valid lastLogin to recent_activity_users (move to not_to_be_deleted)
-        # These users skip Cloud Check entirely
-        recent_activity_users.extend(users_without_valid_login)
         
         # Create output file paths
         outputs_dir = Path(output_dir)
@@ -444,10 +460,9 @@ async def validate_cloud_login(
         print(f"CLOUD LOGIN VALIDATION COMPLETE")
         print(f"{'='*70}")
         print(f"Exceeds threshold (to delete): {len(exceeds_threshold_users)}")
-        print(f"Recent activity (not to delete): {len(recent_activity_users)}")
-        print(f"  - With recent cloud activity: {len(recent_activity_users) - len(users_without_valid_login)}")
-        print(f"  - Without valid lastLogin (skipped Cloud Check): {len(users_without_valid_login)}")
-        print(f"Missing/invalid cloud data: {missing_data_count}")
+        print(f"Not to delete: {len(recent_activity_users)}")
+        print(f"  - With recent cloud activity (≤ threshold): {len([u for u in recent_activity_users if u.get('cloud_days_since_login') is not None])}")
+        print(f"  - No cloud data found (expected for non-IBM): {missing_data_count}")
         print(f"Duration: {duration:.1f}s")
         print(f"{'='*70}\n")
         
@@ -458,8 +473,7 @@ async def validate_cloud_login(
             "output": {
                 "exceeds_threshold": len(exceeds_threshold_users),
                 "recent_activity": len(recent_activity_users),
-                "skipped_no_lastlogin": len(users_without_valid_login),
-                "missing_data": missing_data_count
+                "no_cloud_data": missing_data_count  # Users with no cloud data (moved to not_to_be_deleted)
             },
             "files_created": {
                 "to_delete": str(to_delete_file),
