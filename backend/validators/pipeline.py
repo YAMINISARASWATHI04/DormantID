@@ -159,7 +159,9 @@ async def run_validation_pipeline(
         
         # Step 1: ISV Validation
         if checks.get("isv_validation", False):
-            print(f"[1/5] Running ISV Validation...")
+            print(f"\n{'='*70}")
+            print(f"[1/5] STARTING ISV VALIDATION")
+            print(f"{'='*70}")
             if status_callback:
                 status_callback("ISV Validation", "running")
             result = await validate_isv(
@@ -183,7 +185,9 @@ async def run_validation_pipeline(
         
         # Step 2: Active Status Check
         if checks.get("active_status", False):
-            print(f"[2/5] Running Active Status Check...")
+            print(f"\n{'='*70}")
+            print(f"[2/5] STARTING DORMANCY CHECK (Active Status)")
+            print(f"{'='*70}")
             if status_callback:
                 status_callback("Dormancy Check", "running")
             result = validate_active_status(
@@ -206,7 +210,9 @@ async def run_validation_pipeline(
         
         # Step 3: Last Login Check
         if checks.get("last_login", False):
-            print(f"[3/5] Running Last Login Check...")
+            print(f"\n{'='*70}")
+            print(f"[3/5] STARTING LAST LOGIN CHECK")
+            print(f"{'='*70}")
             if status_callback:
                 status_callback("Last Login Check", "running")
             result = validate_last_login(
@@ -231,7 +237,9 @@ async def run_validation_pipeline(
         
         # Step 4: BluPages Validation
         if checks.get("bluepages", False):
-            print(f"[4/5] Filtering IBM emails and running BluPages Validation...")
+            print(f"\n{'='*70}")
+            print(f"[4/5] STARTING BLUEPAGES VALIDATION")
+            print(f"{'='*70}")
             if status_callback:
                 status_callback("BluPages Validation", "running")
             
@@ -339,10 +347,12 @@ async def run_validation_pipeline(
         cloud_threshold = 1095  # 3 years - hardcoded as per requirements
         
         if checks.get("cloud_login", False):
-            print(f"[5/5] Running Cloud Last Login Check (Final Stage)...")
+            print(f"\n{'='*70}")
+            print(f"[5/5] STARTING CLOUD VALIDATION (FINAL STAGE)")
+            print(f"{'='*70}")
             print(f"  Cloud Login Threshold: {cloud_threshold} days (3 years - fixed)")
             if status_callback:
-                status_callback("Cloud Login Check", "running")
+                status_callback("Cloud Validation", "running")
             
             # Determine input file for cloud login check
             # Priority: BluPages to_delete > Last Login old_login > Active users > Original extraction
@@ -393,11 +403,11 @@ async def run_validation_pipeline(
                 
                 print(f"✓ Cloud Login Check complete: {summary['cloud_exceeds_threshold']} exceed threshold, {summary['cloud_recent_activity']} recent activity")
                 if status_callback:
-                    status_callback("Cloud Login Check", "completed")
+                    status_callback("Cloud Validation", "completed")
             else:
                 print(f"✓ No users to validate via Cloud Login Check (no input file available)")
                 if status_callback:
-                    status_callback("Cloud Login Check", "completed")
+                    status_callback("Cloud Validation", "completed")
             
             print()
         
@@ -474,14 +484,22 @@ async def run_validation_pipeline(
                         if file_path != decision_result["output_file"]:
                             files_to_remove.append(file_path)
         
-        # Also clean up ALL files in output directory except the final decision file
-        # This catches any files created directly by validators
+        # Clean up intermediate files in output directory (but preserve previous decision files)
+        # Only remove files that were created during THIS pipeline run
         outputs_dir = Path(output_dir)
         
         if outputs_dir.exists():
             for file_path in outputs_dir.glob("*.json"):
-                # Keep only the final decision file
-                if str(file_path) != decision_result["output_file"] and str(file_path) not in files_to_remove:
+                # Skip the final decision file
+                if str(file_path) == decision_result["output_file"]:
+                    continue
+                
+                # Skip previous decision files (preserve history)
+                if file_path.name.startswith('dormant_id_decisions_'):
+                    continue
+                
+                # Only remove intermediate files (not decision files)
+                if str(file_path) not in files_to_remove:
                     files_to_remove.append(str(file_path))
         
         # Remove intermediate files

@@ -836,7 +836,8 @@ function App() {
                         { key: 'isv_validation', label: 'ISV Validation' },
                         { key: 'dormancy_check', label: 'Dormancy Check' },
                         { key: 'last_login_check', label: 'Last Login' },
-                        { key: 'bluepages_check', label: 'BluPages' }
+                        { key: 'bluepages_check', label: 'BluPages' },
+                        { key: 'cloud_validation', label: 'Cloud Validation' }
                       ].map((step, index, array) => {
                         // Determine step status
                         let stepStatus = 'pending';

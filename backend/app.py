@@ -451,7 +451,8 @@ class ExtractorWrapper:
                         'isv_validation': 'pending',
                         'dormancy_check': 'pending',
                         'last_login_check': 'pending',
-                        'bluepages_check': 'pending'
+                        'bluepages_check': 'pending',
+                        'cloud_validation': 'pending'
                     }
                 })
                 try:
@@ -719,30 +720,36 @@ class ExtractorWrapper:
             logger.error(f"Bluepages pipeline error: {e}", exc_info=True)
     async def _run_validation_pipeline(self, extraction_file: str):
         """
-        Run validation pipeline based on filter configuration from UI checkboxes.
-        Maps UI filter names to validation checks.
+        Run validation pipeline after extraction completes.
+        
+        The validation pipeline ALWAYS runs all steps in sequence:
+        1. ISV Validation
+        2. Active Status (Dormancy Check)
+        3. Last Login Check
+        4. BluPages Validation
+        5. Cloud Login Validation (Final Stage)
+        
+        Note: filter_config contains EXTRACTION filters (applied during data fetch),
+        not validation pipeline steps. The validation pipeline runs independently.
         """
         try:
-            # Map filter IDs to validation checks
-            # UI sends filters like: {"isv_validation": true, "dormancy_check": true, ...}
-            checks = {}
+            logger.info("="*70)
+            logger.info("STARTING VALIDATION PIPELINE")
+            logger.info("="*70)
             
-            if self.filter_config.get('isv_validation'):
-                checks['isv_validation'] = True
-                checks['active_status'] = True  # Always check active status after ISV
-            
-            if self.filter_config.get('dormancy_check'):
-                checks['last_login'] = True
-                checks['bluepages'] = True  # Always run BluPages after login check
-            
-            # If no checks selected, skip validation
-            if not checks:
-                logger.info("No validation checks selected, skipping validation pipeline")
-                return
+            # ALWAYS run all validation steps after extraction
+            # These are independent of the extraction filters selected
+            checks = {
+                'isv_validation': True,   # Step 1: ISV Validation
+                'active_status': True,     # Step 2: Dormancy Check (Active Status)
+                'last_login': True,        # Step 3: Last Login Check
+                'bluepages': True,         # Step 4: BluPages Validation
+                'cloud_login': True        # Step 5: Cloud Validation (FINAL)
+            }
             
             # Update status
             StatusManager.update_status({'status': 'validating', 'error': None})
-            logger.info(f"Starting validation pipeline with checks: {list(checks.keys())}")
+            logger.info(f"Validation checks to run: {list(checks.keys())}")
             
             # Run the validation pipeline
             # Get the project root directory (parent of backend/)
@@ -759,7 +766,8 @@ class ExtractorWrapper:
                     'ISV Validation': 'isv_validation',
                     'Dormancy Check': 'dormancy_check',
                     'Last Login Check': 'last_login_check',
-                    'BluPages Validation': 'bluepages_check'  # Changed to match initial structure
+                    'BluPages Validation': 'bluepages_check',
+                    'Cloud Validation': 'cloud_validation'
                 }
                 
                 # Get current status to preserve validation_progress
@@ -769,7 +777,8 @@ class ExtractorWrapper:
                     'isv_validation': 'pending',
                     'dormancy_check': 'pending',
                     'last_login_check': 'pending',
-                    'bluepages_check': 'pending'  # Changed to match initial structure
+                    'bluepages_check': 'pending',
+                    'cloud_validation': 'pending'
                 })
                 
                 # Update the specific step status
@@ -1265,9 +1274,24 @@ def view_file(filename):
                 'error': error or 'File not found'
             }), 404 if error == 'File not found' else 400
         
+        # Check file size
+        file_size = os.path.getsize(file_path)
+        if file_size < 10:  # Less than 10 bytes is likely corrupted
+            return jsonify({
+                'success': False,
+                'error': f'File appears to be corrupted or incomplete (size: {file_size} bytes)'
+            }), 400
+        
         # Read and parse JSON file
-        with open(file_path, 'r') as f:
-            data = json.load(f)
+        try:
+            with open(file_path, 'r') as f:
+                data = json.load(f)
+        except json.JSONDecodeError as je:
+            logger.error(f"JSON decode error for {filename}: {je}")
+            return jsonify({
+                'success': False,
+                'error': f'Invalid JSON format: {str(je)}'
+            }), 400
         
         # Return the full data structure
         # If it's a decision file, it will have categories (to_be_deleted, not_to_be_deleted, etc.)
@@ -1285,27 +1309,37 @@ def view_file(filename):
 @app.route('/api/extractions', methods=['GET'])
 @swag_from(swagger_specs.list_extractions_spec)
 def list_extractions():
-    """List all available extraction files"""
+    """List all available extraction and decision files"""
     try:
         extractions = []
         # Use absolute path
         backend_dir = os.path.dirname(os.path.abspath(__file__))
         project_root = os.path.dirname(backend_dir)
-        extraction_dir = os.path.join(project_root, 'backend', 'extractions')
         
-        if os.path.exists(extraction_dir):
-            for filename in os.listdir(extraction_dir):
-                if filename.endswith('.json') and filename.startswith('extraction_'):
-                    file_path = os.path.join(extraction_dir, filename)
-                    file_stats = os.stat(file_path)
-                    
-                    extractions.append({
-                        'filename': filename,
-                        'size': file_stats.st_size,
-                        'size_mb': round(file_stats.st_size / (1024 * 1024), 2),
-                        'created': datetime.fromtimestamp(file_stats.st_ctime).isoformat(),
-                        'modified': datetime.fromtimestamp(file_stats.st_mtime).isoformat()
-                    })
+        # Check both extraction and output directories
+        directories = [
+            (os.path.join(project_root, 'backend', 'extractions'), 'extraction_'),
+            (os.path.join(project_root, 'backend', 'outputs'), 'dormant_id_decisions_')
+        ]
+        
+        for directory, prefix in directories:
+            if os.path.exists(directory):
+                for filename in os.listdir(directory):
+                    if filename.endswith('.json') and filename.startswith(prefix):
+                        file_path = os.path.join(directory, filename)
+                        file_stats = os.stat(file_path)
+                        
+                        # Determine file type
+                        file_type = 'extraction' if prefix == 'extraction_' else 'decision'
+                        
+                        extractions.append({
+                            'filename': filename,
+                            'type': file_type,
+                            'size': file_stats.st_size,
+                            'size_mb': round(file_stats.st_size / (1024 * 1024), 2),
+                            'created': datetime.fromtimestamp(file_stats.st_ctime).isoformat(),
+                            'modified': datetime.fromtimestamp(file_stats.st_mtime).isoformat()
+                        })
         
         # Sort by creation time (newest first)
         extractions.sort(key=lambda x: x['created'], reverse=True)
