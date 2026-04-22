@@ -1162,10 +1162,11 @@ def stop_extraction():
         
         # Check if there's actually a job running by checking status
         current_status = StatusManager.load_status()
-        if current_status.get('status') != 'under_processing':
+        status = current_status.get('status')
+        if status not in ['under_processing', 'validating']:
             return jsonify({
                 'success': False,
-                'error': 'No extraction is currently running (status check)'
+                'error': f'No extraction/validation is currently running (current status: {status})'
             }), 400
         
         with current_extractor_lock:

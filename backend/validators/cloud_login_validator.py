@@ -257,9 +257,37 @@ async def validate_cloud_login(
         # Create output directory
         Path(output_dir).mkdir(parents=True, exist_ok=True)
         
-        # Extract IAM IDs from users
-        iam_id_to_user = {}
+        # First, validate lastLogin field for all users
+        # Users without valid lastLogin should skip Cloud Check
+        users_with_valid_login = []
+        users_without_valid_login = []
+        
+        print(f"\n{'='*70}")
+        print(f"CLOUD LOGIN VALIDATOR - Starting")
+        print(f"{'='*70}")
+        print(f"Total users: {input_count}")
+        print(f"Validating lastLogin field...")
+        
         for user in users:
+            last_login = user.get("lastLogin")
+            
+            # Check if lastLogin is valid (not null, not empty, not missing)
+            if last_login is None or last_login == "" or not isinstance(last_login, str):
+                # No valid lastLogin - skip Cloud Check
+                user["cloud_last_login"] = None
+                user["cloud_login_reason"] = "NO IBM Cloud Check - Missing/Invalid lastLogin in Cloudant"
+                user["skip_cloud_check"] = True
+                users_without_valid_login.append(user)
+            else:
+                # Valid lastLogin - proceed with Cloud Check
+                users_with_valid_login.append(user)
+        
+        print(f"✓ Users with valid lastLogin: {len(users_with_valid_login)}")
+        print(f"✓ Users without valid lastLogin (skip Cloud Check): {len(users_without_valid_login)}")
+        
+        # Extract IAM IDs only from users with valid lastLogin
+        iam_id_to_user = {}
+        for user in users_with_valid_login:
             # Try to extract IAM ID from user_id or email
             user_id = user.get("user_id", user.get("id", ""))
             email = user.get("email", user.get("username", ""))
@@ -276,11 +304,7 @@ async def validate_cloud_login(
             if iam_id:
                 iam_id_to_user[iam_id] = user
         
-        print(f"\n{'='*70}")
-        print(f"CLOUD LOGIN VALIDATOR - Starting")
-        print(f"{'='*70}")
-        print(f"Total users: {input_count}")
-        print(f"Users with IAM IDs: {len(iam_id_to_user)}")
+        print(f"Users with IAM IDs (for Cloud Check): {len(iam_id_to_user)}")
         print(f"Threshold: {days_threshold} days (~{days_threshold/365:.1f} years)")
         print(f"Batch size: {batch_size}")
         print(f"{'='*70}\n")
@@ -365,14 +389,18 @@ async def validate_cloud_login(
                     exceeds_threshold_users.append(user)
                     missing_data_count += 1
         
-        # Add users without IAM IDs to exceeds_threshold (keep in to_be_deleted)
-        for user in users:
+        # Add users without IAM IDs from valid login users to exceeds_threshold (keep in to_be_deleted)
+        for user in users_with_valid_login:
             user_id = user.get("user_id", user.get("id", ""))
             if user_id not in iam_id_to_user:
                 user["cloud_last_login"] = None
                 user["cloud_login_reason"] = "No IAM ID found for cloud check"
                 exceeds_threshold_users.append(user)
                 missing_data_count += 1
+        
+        # Add users without valid lastLogin to recent_activity_users (move to not_to_be_deleted)
+        # These users skip Cloud Check entirely
+        recent_activity_users.extend(users_without_valid_login)
         
         # Create output file paths
         outputs_dir = Path(output_dir)
@@ -383,7 +411,7 @@ async def validate_cloud_login(
         with open(to_delete_file, 'w') as f:
             json.dump(exceeds_threshold_users, f, indent=2)
         
-        # Append recent activity users to not_to_be_deleted
+        # Append recent activity users (including those without valid lastLogin) to not_to_be_deleted
         if recent_activity_users:
             if not_to_delete_file.exists():
                 try:
@@ -417,7 +445,9 @@ async def validate_cloud_login(
         print(f"{'='*70}")
         print(f"Exceeds threshold (to delete): {len(exceeds_threshold_users)}")
         print(f"Recent activity (not to delete): {len(recent_activity_users)}")
-        print(f"Missing/invalid data: {missing_data_count}")
+        print(f"  - With recent cloud activity: {len(recent_activity_users) - len(users_without_valid_login)}")
+        print(f"  - Without valid lastLogin (skipped Cloud Check): {len(users_without_valid_login)}")
+        print(f"Missing/invalid cloud data: {missing_data_count}")
         print(f"Duration: {duration:.1f}s")
         print(f"{'='*70}\n")
         
@@ -428,6 +458,7 @@ async def validate_cloud_login(
             "output": {
                 "exceeds_threshold": len(exceeds_threshold_users),
                 "recent_activity": len(recent_activity_users),
+                "skipped_no_lastlogin": len(users_without_valid_login),
                 "missing_data": missing_data_count
             },
             "files_created": {

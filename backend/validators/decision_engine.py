@@ -119,9 +119,7 @@ def consolidate_decisions(
                         processed_ids.add(user_id)
         
         # Process Cloud Login results (FINAL STAGE - takes precedence over BluPages)
-        # Cloud login uses fixed 3-year threshold (1095 days)
-        cloud_threshold_days = 1095
-        cloud_threshold_years = 3.0
+        # Cloud login uses the same threshold as configured in UI (passed via pipeline)
         
         if "cloud_login" in pipeline_results.get("results", {}):
             cloud_result = pipeline_results["results"]["cloud_login"]
@@ -146,8 +144,8 @@ def consolidate_decisions(
                         if user.get("bluepages_status"):
                             reasons.append(f"BluPages: {user.get('bluepages_status')}")
                         
-                        # Add cloud login reason as FINAL decision with fixed threshold
-                        reasons.append(f"{cloud_reason} (Cloud threshold: {cloud_threshold_days} days / {cloud_threshold_years} years - fixed) - FINAL DECISION: Cloud Login Check Failed")
+                        # Add cloud login reason as FINAL decision with user-defined threshold
+                        reasons.append(f"{cloud_reason} (Cloud threshold: {threshold_days} days / {threshold_years} years - user-defined) - FINAL DECISION: Cloud Login Check Failed")
                         
                         decisions["to_be_deleted"].append({
                             "id": user_id,
@@ -170,11 +168,19 @@ def consolidate_decisions(
                     if user_id not in processed_ids:
                         cloud_reason = user.get("cloud_login_reason", "Recent activity found in Cloud")
                         cloud_days = user.get("cloud_days_since_login", "unknown")
+                        skip_cloud_check = user.get("skip_cloud_check", False)
                         
-                        reasons = [
-                            f"{cloud_reason} (Cloud threshold: {cloud_threshold_days} days / {cloud_threshold_years} years - fixed)",
-                            f"FINAL DECISION: Cloud Login Check Passed (cloud activity: {cloud_days} days)"
-                        ]
+                        # Check if user skipped Cloud Check due to missing lastLogin
+                        if skip_cloud_check or "NO IBM Cloud Check" in cloud_reason:
+                            reasons = [
+                                f"User has old Cloudant login (>{threshold_days} days / {threshold_years} years - user-defined)",
+                                f"FINAL DECISION: {cloud_reason}"
+                            ]
+                        else:
+                            reasons = [
+                                f"{cloud_reason} (Cloud threshold: {threshold_days} days / {threshold_years} years - user-defined)",
+                                f"FINAL DECISION: Cloud Login Check Passed (cloud activity: {cloud_days} days)"
+                            ]
                         
                         decisions["not_to_be_deleted"].append({
                             "id": user_id,

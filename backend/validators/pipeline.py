@@ -261,11 +261,11 @@ async def run_validation_pipeline(
             
             print(f"  IBM emails: {len(ibm_users)}, Non-IBM emails: {len(non_ibm_users)}")
             
-            # Mark non-IBM users as skipping BluPages check (for decision engine)
+            # Mark non-IBM users as skipping BluPages check (will go to Cloud Check)
             if non_ibm_users:
                 for user in non_ibm_users:
                     user['skip_bluepages'] = True
-                    user['skip_reason'] = 'Non-IBM Email Domain'
+                    user['skip_reason'] = 'Non-IBM Email Domain - Will check Cloud activity'
             
             # Run BluPages validation only on IBM users - pass data directly
             if ibm_users:
@@ -278,12 +278,24 @@ async def run_validation_pipeline(
                 )
                 results["bluepages"] = result
                 
-                # Add non-IBM users data directly to results for decision engine
+                # Merge non-IBM users with BluPages not_found users for Cloud Check
+                # Both groups will go to Cloud Check in Step 5
                 if non_ibm_users:
-                    results["bluepages"]["non_ibm_users"] = {
-                        "count": len(non_ibm_users),
-                        "data": non_ibm_users
-                    }
+                    # Save non-IBM users to to_be_deleted file (will be input for Cloud Check)
+                    to_delete_file = result.get("files_created", {}).get("to_delete")
+                    if to_delete_file and Path(to_delete_file).exists():
+                        # Read existing to_delete users (not found in BluPages)
+                        with open(to_delete_file, 'r') as f:
+                            to_delete_users = json.load(f)
+                        
+                        # Add non-IBM users to the list
+                        to_delete_users.extend(non_ibm_users)
+                        
+                        # Write back combined list
+                        with open(to_delete_file, 'w') as f:
+                            json.dump(to_delete_users, f, indent=2)
+                        
+                        print(f"  Added {len(non_ibm_users)} non-IBM users to Cloud Check input")
                 
                 checks_run.append("bluepages")
                 
@@ -291,30 +303,36 @@ async def run_validation_pipeline(
                 summary["found_in_bluepages"] = result.get("output", {}).get("found_in_bluepages", 0)
                 summary["not_found_in_bluepages"] = result.get("output", {}).get("not_found_in_bluepages", 0)
                 summary["non_ibm_emails"] = len(non_ibm_users)
-                # Non-IBM users + users not found in BluPages = to_delete
-                summary["to_delete"] = summary["not_found_in_bluepages"] + len(non_ibm_users)
+                # Users not found in BluPages + non-IBM users will go to Cloud Check
+                summary["to_cloud_check"] = summary["not_found_in_bluepages"] + len(non_ibm_users)
                 # Users found in BluPages + recent login users = not_to_delete
                 summary["not_to_delete"] = summary["found_in_bluepages"] + summary.get("recent_login", 0)
                 
                 print(f"✓ BluPages Validation complete: {summary['found_in_bluepages']} found, {summary['not_found_in_bluepages']} not found")
-                print(f"  Non-IBM emails (skipped BluPages): {len(non_ibm_users)}")
+                print(f"  Non-IBM emails (will check Cloud): {len(non_ibm_users)}")
+                print(f"  Total users for Cloud Check: {summary['to_cloud_check']}")
                 if status_callback:
                     status_callback("BluPages Validation", "completed")
             else:
                 print(f"✓ No IBM users to validate via BluPages")
-                if status_callback:
-                    status_callback("BluPages Validation", "completed")
                 
                 # Use the provided output_dir parameter
                 outputs_dir = Path(output_dir)
                 outputs_dir.mkdir(parents=True, exist_ok=True)
                 to_delete_file = outputs_dir / f"to_be_deleted_{timestamp}.json"
                 
+                # Save non-IBM users to to_delete file (will be input for Cloud Check)
+                if non_ibm_users:
+                    with open(to_delete_file, 'w') as f:
+                        json.dump(non_ibm_users, f, indent=2)
+                    print(f"  Non-IBM emails (will check Cloud): {len(non_ibm_users)}")
+                    print(f"  Total users for Cloud Check: {len(non_ibm_users)}")
+                
                 # Store result for final outputs
                 results["bluepages"] = {
                     "success": True,
                     "validator": "bluepages",
-                    "input_count": 0,
+                    "input_count": len(non_ibm_users),
                     "output": {
                         "found_in_bluepages": 0,
                         "not_found_in_bluepages": 0
@@ -325,32 +343,25 @@ async def run_validation_pipeline(
                     }
                 }
                 
-                # Add non-IBM users data directly to results for decision engine
-                if non_ibm_users:
-                    results["bluepages"]["non_ibm_users"] = {
-                        "count": len(non_ibm_users),
-                        "data": non_ibm_users
-                    }
-                    summary["non_ibm_emails"] = len(non_ibm_users)
-                    summary["to_delete"] = len(non_ibm_users)
-                else:
-                    summary["to_delete"] = 0
-                
+                summary["non_ibm_emails"] = len(non_ibm_users)
+                summary["to_cloud_check"] = len(non_ibm_users)
                 summary["not_to_delete"] = summary.get("recent_login", 0)
                 
                 checks_run.append("bluepages")
+                if status_callback:
+                    status_callback("BluPages Validation", "completed")
             
             print()
         
         # Step 5: Cloud Last Login Check (FINAL STAGE)
-        # Default threshold for cloud login is 3 years (1095 days)
-        cloud_threshold = 1095  # 3 years - hardcoded as per requirements
+        # Use the same threshold as Last Login Check (from UI configuration)
+        # This ensures consistency across all validation steps
         
         if checks.get("cloud_login", False):
             print(f"\n{'='*70}")
             print(f"[5/5] STARTING CLOUD VALIDATION (FINAL STAGE)")
             print(f"{'='*70}")
-            print(f"  Cloud Login Threshold: {cloud_threshold} days (3 years - fixed)")
+            print(f"  Cloud Login Threshold: {days_threshold} days (~{days_threshold/365:.1f} years - user-defined)")
             if status_callback:
                 status_callback("Cloud Validation", "running")
             
@@ -383,7 +394,7 @@ async def run_validation_pipeline(
                 print(f"  Input: {cloud_input_file}")
                 result = await validate_cloud_login(
                     input_file=cloud_input_file,
-                    days_threshold=cloud_threshold,  # Use fixed 3-year threshold
+                    days_threshold=days_threshold,  # Use dynamic threshold from UI
                     output_dir=output_dir,
                     timestamp=timestamp,
                     batch_size=50,  # Fixed batch size as per requirements

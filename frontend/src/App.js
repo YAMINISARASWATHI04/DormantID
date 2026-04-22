@@ -228,13 +228,14 @@ function App() {
       if (response.data.success) {
         setAvailableFilters(response.data.filters);
         
-        // Set default selected filters (ISV Validation, Dormancy Check, Federated ID removal)
+        // Set default selected filters (ISV Validation, Dormancy Check, Federated ID removal, Cloud Activity Validation)
         const defaultFilters = {};
         response.data.filters.forEach(filter => {
           // Check if filter ID matches the default ones
           if (filter.id === 'isv_validation' ||
               filter.id === 'dormancy_check' ||
-              filter.id === 'federated_id_removal') {
+              filter.id === 'federated_id_removal' ||
+              filter.id === 'cloud_activity_validation') {
             defaultFilters[filter.id] = true;
           }
         });
@@ -451,12 +452,13 @@ function App() {
         setThresholdValue(3);
         setThresholdUnit('years');
         
-        // Reset to default filters (ISV Validation, Dormancy Check, Federated ID removal)
+        // Reset to default filters (ISV Validation, Dormancy Check, Federated ID removal, Cloud Activity Validation)
         const defaultFilters = {};
         availableFilters.forEach(filter => {
           if (filter.id === 'isv_validation' ||
               filter.id === 'dormancy_check' ||
-              filter.id === 'federated_id_removal') {
+              filter.id === 'federated_id_removal' ||
+              filter.id === 'cloud_activity_validation') {
             defaultFilters[filter.id] = true;
           }
         });
